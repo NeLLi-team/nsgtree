@@ -26,10 +26,10 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 ### Docker / Shifter
 * Load the working directory that contains files with models, querydir and config file with shifter
 ```
-shifterimg pull fschulzjgi/nsgtree:0.3
+shifterimg pull fschulzjgi/nsgtree:0.3.2
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.3 \
+  --image=fschulzjgi/nsgtree:0.3.2 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -39,6 +39,25 @@ shifter \
   models="/nsgtree/example/rnapol.hmm" \
   --conda-prefix /nsgtree/.snakemake/conda \
   --configfile /nsgtree/example/user_config.yml"
+```
+* Specify ref dir and query dir and config file with shifter, using the UNI56 models provided by nsgtree
+```
+qfaa=$1
+rfaa=$2
+configf=$3
+shifter \
+  --volume=$(pwd):/nsgtree/example \
+  --image=fschulzjgi/nsgtree:0.3.2 \
+  bash -c \
+  "snakemake --snakefile /nsgtree/workflow/Snakefile \
+  -j 24 \
+  --use-conda \
+  --config \
+  qfaadir="/nsgtree/example/$qfaa" \
+  rfaadir="/nsgtree/example/$rfaa" \
+  models="/nsgtree/resources/models/UNI56.hmm" \
+  --conda-prefix /nsgtree/.snakemake/conda \
+  --configfile /nsgtree/example/$configf"
 ```
 * For docker paths to modeldir, querydir, configfile can be loaded separately with the -v flag
 ```
