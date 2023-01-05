@@ -1,0 +1,13 @@
+rfaadir: ""
+hmmsearch_cutoff: "-E 1e-10"  # e.g.  "-E 1e-10", "--cut_ga" or something else 
+hmmsearch_cpu: "24"
+minmarker: "0.7" # 50 percent of markers need to be present
+maxsdup: "4"  # genome will be removed if at least one marker is present in more than n copies
+maxdupl: "0.3" # percent of markers that can be present in more than single copy
+extract_processes: "8"
+proteintrees: "LG+F+I+G4" # LG4X or other iqtree models
+speciestree: "LG+F+I+G4" # LG4X or other iqtree models
+mafft_thread: "--thread 4" 
+mafftv: "" # "-linsi", "-ginsi" ,... 
+mafft: "" # "--localpair", " --globalpair", " --maxiterate 1000 --genafpair, ..."
+trimal_gt: "-gt 0.1" # trim positions that have less than 10 percent information , can add other command line options
