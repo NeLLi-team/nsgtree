@@ -24,11 +24,11 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 * Results can be found in a subdir in <query faa dir\>/nsgt_<analysis name\>"
 
 ### Docker / Shifter
-* Load the working directory that contains files with models, querydir and config file with shifter
+* Shifter on NERSC Saul or Cori
 ```
 shifterimg pull fschulzjgi/nsgtree:0.3.2
 ```
-
+* Load the working directory that contains files with models, querydir and config file with shifter
 ```
 shifter \
   --volume=$(pwd):/nsgtree/example \
