@@ -1,9 +1,7 @@
 from Bio import SeqIO
 from collections import defaultdict
 import glob
-import pandas as pd
 import sys
-import subprocess
 
 alndir = sys.argv[1] # dir with aligned multifa
 aln_concat = sys.argv[2] # name of concat aln
