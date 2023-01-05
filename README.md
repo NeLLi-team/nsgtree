@@ -27,6 +27,9 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 * Load the working directory that contains files with models, querydir and config file with shifter
 ```
 shifterimg pull fschulzjgi/nsgtree:0.3.2
+```
+
+```
 shifter \
   --volume=$(pwd):/nsgtree/example \
   --image=fschulzjgi/nsgtree:0.3.2 \
