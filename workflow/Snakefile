@@ -10,18 +10,21 @@ snakemake -j 24 --use-conda --config qfaadir="example" models="resources/models/
 from pathlib import Path
 import os
 import sys
-from datetime import datetime  
-
-current_date_time = datetime.now().strftime("%m-%d-%Y--%H-%M-%S")
 
 configfile: "workflow/config.yml"
 # input and output dirs
 qfaadir = Path(config["qfaadir"])
+rfaadir = Path(config["rfaadir"])
 qfaadir_base = os.path.basename(qfaadir)
+rfaadir_base = os.path.basename(rfaadir)
 modelscombined = Path(config["models"]) # file that contains all hmms
-modelscombined_base = str(modelscombined).split("/")[-1].split(".")[0]
-analysisname = qfaadir_base + "_" + modelscombined_base
-outdir = config["qfaadir"] + "/nsgt_out/" + analysisname + "_" + current_date_time
+models_base = os.path.basename(modelscombined).split(".")[0]
+analysisname = qfaadir_base + \
+		"-" + rfaadir_base + \
+		"-" + models_base + \
+		"-" + config["tmethod"] + \
+		"-perc" + str(int(float(config["minmarker"])*10))
+outdir = config["qfaadir"] + "/nsgt_out/" + analysisname
 reformatted_faa_dir = outdir + "/analyses/reformatted_faa/"
 
 args = sys.argv
@@ -63,7 +66,8 @@ rule help:
 
 if config["rfaadir"]:
   rfaadir = Path(config["rfaadir"])
-  FAABASENAMES = [x.stem for x in qfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]] + [x.stem for x in rfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]]
+  FAABASENAMES = [x.stem for x in qfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]] +\
+		 [x.stem for x in rfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]]
   rule reformat_faa:
     """
     check format of faa input and reformat
@@ -78,7 +82,7 @@ if config["rfaadir"]:
       rdir = Path(config["rfaadir"])
     output:
       reformatted_faa_dir = directory(outdir + "/analyses/reformatted_faa"),
-      q_colors_itol = outdir + "/itol/" + modelscombined_base + ".colors.itol.txt",
+      q_colors_itol = outdir + "/itol/" + models_base + ".colors.itol.txt",
     shell:
       """
       mkdir -p {output.reformatted_faa_dir}
@@ -139,7 +143,7 @@ rule run_hmmsearch:
   log:
     outdir + "/analyses/log/hmmsearch/hmmsearch.log"
   output:
-    hmmsearchout = outdir + "/analyses/hmmout/" + modelscombined_base + ".out"
+    hmmsearchout = outdir + "/analyses/hmmout/" + models_base + ".out"
   shell:
     """
     (echo "hmmsearch --noali {params.hmmsearch_cutoff} --domtblout  {output.hmmsearchout} --cpu {params.hmmsearch_cpu} {input.modelshmm} {input.faacombined}"
@@ -154,7 +158,7 @@ rule run_hmmsearch_count_filter:
   conda:
     "envs/nsgt.yml"
   input:
-    hmmsearchout = outdir + "/analyses/hmmout/" + modelscombined_base + ".out"
+    hmmsearchout = outdir + "/analyses/hmmout/" + models_base + ".out"
   params:
     faadirf = outdir + "/analyses/reformatted_faa",
     modelshmm = modelscombined,
@@ -164,9 +168,9 @@ rule run_hmmsearch_count_filter:
   log:
     outdir + "/analyses/log/hmmsearch/hmmsearch_filtering.log"
   output:
-    hitcounts = outdir + "/analyses/hmmout/" + modelscombined_base + ".counts",
-    taxa_removed = outdir + "/analyses/hmmout/" + modelscombined_base + ".removedtaxa",
-    itolcounts = outdir + "/itol/" + modelscombined_base + ".counts.itol.txt"
+    hitcounts = outdir + "/analyses/hmmout/" + models_base + ".counts",
+    taxa_removed = outdir + "/analyses/hmmout/" + models_base + ".removedtaxa",
+    itolcounts = outdir + "/itol/" + models_base + ".counts.itol.txt"
   shell:
     """
     (echo "python workflow/scripts/hmmsearch_count_filter.py {params.faadirf} {params.modelshmm} {input.hmmsearchout} {output.hitcounts} {output.taxa_removed} {params.minmarker} {params.maxsdup} {params.maxdupl} {output.itolcounts}"
@@ -184,8 +188,8 @@ rule extract_qhits:
     faadirf = outdir + "/analyses/reformatted_faa",
     extract_processes = config["extract_processes"]
   input:
-    hmmsearchout = outdir + "/analyses/hmmout/" + modelscombined_base + ".out",
-    taxa_removed = outdir + "/analyses/hmmout/" + modelscombined_base + ".removedtaxa"
+    hmmsearchout = outdir + "/analyses/hmmout/" + models_base + ".out",
+    taxa_removed = outdir + "/analyses/hmmout/" + models_base + ".removedtaxa"
   output:
     outdir + "/analyses/hits_faa/{model}.faa"
   shell:
@@ -222,30 +226,53 @@ rule align_trim:
     """
 
 
-rule build_trees:
-  """
-  build single protein trees for each marker
-  """
-  conda:
-    "envs/nsgt.yml"
-  log:
-    outdir + "/analyses/log/trees/{model}.log"
-  input:
-    trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
-  params:
-    proteintrees = config["proteintrees"],
-    outdirt = outdir + "/analyses/proteintrees/iqtree",
-    outpath = outdir + "/analyses/proteintrees/iqtree/{model}"
-  output:
-    tree = outdir + "/proteintrees/{model}.treefile"
-  shell:
+if config["tmethod"] == "fasttree":
+  rule build_trees:
+    """build single protein trees for each marker"""
+    conda:
+      "envs/nsgt.yml"
+    log:
+      outdir + "/analyses/log/trees/{model}.log"
+    input:
+      trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
+    params:
+      proteintrees = config["ft_proteintrees"],
+      outdirt = outdir + "/analyses/proteintrees/fasttree",
+      outpath = outdir + "/analyses/proteintrees/fasttree/{model}"
+    output:
+      tree = outdir + "/proteintrees/{model}.treefile"
+    shell:
+      """
+      (echo "fasttree {params.proteintrees} {input.trimmedaln} > {output.tree}"
+      mkdir -p {params.outdirt}
+      fasttree {params.proteintrees} {input.trimmedaln} > {params.outpath}.treefile || touch {output.tree}
+      cp {params.outpath}.treefile {output.tree}) >& {log}
+      """
+elif config["tmethod"] == "iqtree":
+  rule build_trees:
     """
-    (echo "iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}"
-    mkdir -p {params.outdirt}
-    iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}
-    cp {params.outpath}.treefile {output.tree}
-    touch {output.tree}) >& {log}
+    build single protein trees for each marker
     """
+    conda:
+      "envs/nsgt.yml"
+    log:
+      outdir + "/analyses/log/trees/{model}.log"
+    input:
+      trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
+    params:
+      proteintrees = config["iq_proteintrees"],
+      outdirt = outdir + "/analyses/proteintrees/iqtree",
+      outpath = outdir + "/analyses/proteintrees/iqtree/{model}"
+    output:
+      tree = outdir + "/proteintrees/{model}.treefile"
+    shell:
+      """
+      (echo "iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}"
+      mkdir -p {params.outdirt}
+      iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}
+      cp {params.outpath}.treefile {output.tree}
+      touch {output.tree}) >& {log}
+      """
 
 
 rule concat_aln:
@@ -265,25 +292,46 @@ rule concat_aln:
     """
 
 
-rule species_tree:
-  conda:
-    "envs/nsgt.yml"
-  log:
-    outdir + "/analyses/log/trees/speciestree.log"
-  params:
-    speciestree = config["speciestree"],
-    outpath = outdir + "/analyses/finaltree/iqtree/" + analysisname
-  input:
-    concataln = outdir + "/" + analysisname + ".mafft_t"
-  output:
-    outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
-    concattree = outdir + "/" + analysisname + ".treefile"
-  shell:
-    """
-    (echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}"
-    iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}
-    cp {output[0]} {output[1]}) >& {log}
-    """
+if config["tmethod"] == "fasttree":
+  rule species_tree:
+    conda:
+      "envs/nsgt.yml"
+    log:
+      outdir + "/analyses/log/trees/speciestree.log"
+    params:
+      speciestree = config["ft_speciestree"],
+      outpath = outdir + "/analyses/finaltree/fasttree/" + analysisname
+    input:
+      concataln = outdir + "/" + analysisname + ".mafft_t"
+    output:
+      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".treefile",
+      concattree = outdir + "/" + analysisname + ".treefile"
+    shell:
+      """
+      (echo "fasttree {params.speciestree} {input.concataln} > {output[0]}"
+      fasttree {params.speciestree} {input.concataln} > {output[0]}
+      cp {output[0]} {output[1]}) >& {log}
+      """
+elif config["tmethod"] == "iqtree":
+  rule species_tree:
+    conda:
+      "envs/nsgt.yml"
+    log:
+      outdir + "/analyses/log/trees/speciestree.log"
+    params:
+      speciestree = config["iq_speciestree"],
+      outpath = outdir + "/analyses/finaltree/iqtree/" + analysisname
+    input:
+      concataln = outdir + "/" + analysisname + ".mafft_t"
+    output:
+      outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
+      concattree = outdir + "/" + analysisname + ".treefile"
+    shell:
+      """
+      (echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}"
+      iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}
+      cp {output[0]} {output[1]}) >& {log}
+      """
 
 
 rule cleanup:
