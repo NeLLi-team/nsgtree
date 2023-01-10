@@ -19,11 +19,11 @@ qfaadir_base = os.path.basename(qfaadir)
 rfaadir_base = os.path.basename(rfaadir)
 modelscombined = Path(config["models"]) # file that contains all hmms
 models_base = os.path.basename(modelscombined).split(".")[0]
-analysisname = qfaadir_base + \
-		"-" + rfaadir_base + \
-		"-" + models_base + \
-		"-" + config["tmethod"] + \
-		"-perc" + str(int(float(config["minmarker"])*10))
+analysisname = str(qfaadir_base + \
+    "-" + rfaadir_base + \
+    "-" + models_base + \
+    "-" + config["tmethod"] + \
+    "-perc" + str(int(float(config["minmarker"])*10))).replace(".", "")
 outdir = config["qfaadir"] + "/nsgt_out/" + analysisname
 reformatted_faa_dir = outdir + "/analyses/reformatted_faa/"
 
@@ -67,7 +67,7 @@ rule help:
 if config["rfaadir"]:
   rfaadir = Path(config["rfaadir"])
   FAABASENAMES = [x.stem for x in qfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]] +\
-		 [x.stem for x in rfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]]
+    [x.stem for x in rfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]]
   rule reformat_faa:
     """
     check format of faa input and reformat
@@ -83,13 +83,14 @@ if config["rfaadir"]:
     output:
       reformatted_faa_dir = directory(outdir + "/analyses/reformatted_faa"),
       q_colors_itol = outdir + "/itol/" + models_base + ".colors.itol.txt",
+      queries = outdir + "/itol/queries.txt"
     shell:
       """
       mkdir -p {output.reformatted_faa_dir}
       cp {input.qdir}/*.faa {input.rdir}/*.faa {output.reformatted_faa_dir}
       echo "TREE_COLORS\nSEPARATOR COMMA\nDATA" > {output.q_colors_itol}
-      ls {input.qdir} | awk -F "." '{{print $1",branch,#cc0000,normal,1"}}' >> {output.q_colors_itol}
-      python workflow/scripts/reformat.py {input.qdir} {output.reformatted_faa_dir}
+      ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1",branch,#cc0000,normal,1"}}' >> {output.q_colors_itol}
+      ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1}}' > {output.queries}
       python workflow/scripts/reformat.py {input.rdir} {output.reformatted_faa_dir}
       """
 else:
@@ -338,17 +339,25 @@ rule cleanup:
   """
   intermediate files are kept including empty files, compress output 
   """
+  conda:
+    "envs/ete3.yml"
   input:
     outdir + "/" + analysisname + ".treefile",
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
   params:
     fdir = outdir + "/analyses",
+    itoldir = outdir + "/itol",
     q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
     tmp_dir = outdir + "/analyses/tmp"
   output:
     outdir + "/analyses.tar.gz"
   shell:
     """
+    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
+    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt ; fi
     rm -r {params.q_faa_f_dir}
     rm -r {params.tmp_dir}
     find {params.fdir} -type f -empty -print -delete 

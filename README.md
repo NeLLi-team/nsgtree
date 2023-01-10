@@ -1,5 +1,5 @@
 # nsgtree
-_v0.3.2 January 5 2023_
+_v0.3.3 January 9 2023_
 
 ## Why use NSGTree (over SGTree)
 New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user provided genomes and a set of phylogenetic markers. NSGTree builds a species tree based on a concatenated alignment of all proteins that were identified with the provided markers HMMs. NSGTree also builds single protein trees for every marker protein that was found. It is a highly simplified version of SGTree. In contrast to SGTree, NSGTree does currently not support marker selection. Initial benchmarking showed that NSGTree is faster than SGTree (~20-50% depending on number of query faa and HMMs)
@@ -26,13 +26,13 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 ### Docker / Shifter
 * Shifter on NERSC Saul or Cori
 ```
-shifterimg pull fschulzjgi/nsgtree:0.3.2
+shifterimg pull fschulzjgi/nsgtree:0.3.3
 ```
 * Load the working directory that contains files with models, querydir and config file with shifter
 ```
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.3.2 \
+  --image=fschulzjgi/nsgtree:0.3.3 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -50,7 +50,7 @@ rfaa=$2
 configf=$3
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.3.2 \
+  --image=fschulzjgi/nsgtree:0.3.3 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \

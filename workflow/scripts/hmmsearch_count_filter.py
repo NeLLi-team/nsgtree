@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 import glob
 from collections import defaultdict
-import seaborn as sns
+#import seaborn as sns
 import os
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -104,7 +104,7 @@ def main():
         for x, y in filteredtaxa_dict.items():
             outfile.write(x + "\t" + ";".join(y) + "\n")
     df = df.drop("sum", axis=1)
-    reorder_cols(df)
+    #reorder_cols(df)
     convert2itol(list(df.columns), outitol)
     with open(outitol, "a") as outitolA:
             df.to_csv(outitolA, header = False, sep = ",")
