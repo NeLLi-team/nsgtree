@@ -11,7 +11,6 @@ New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy c
 ```
 snakemake -j 24 --use-conda --config qfaadir="example" models="resources/models/rnapol.hmm" --configfile user_config.yml
 ```
-or more general
 ```
 snakemake -j <number of processes> --use-conda --config qfaadir="<dir with query faa>" models="<single file that contains all marker HMMs" --configfile <settings specified in user_config.yml>
 ```
