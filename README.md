@@ -1,5 +1,5 @@
 # nsgtree
-_v0.3.3 January 9 2023_
+_v0.4.0 February 4 2023_
 
 ## Why use NSGTree (over SGTree)
 New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user provided genomes and a set of phylogenetic markers. NSGTree builds a species tree based on a concatenated alignment of all proteins that were identified with the provided markers HMMs. NSGTree also builds single protein trees for every marker protein that was found. It is a highly simplified version of SGTree. In contrast to SGTree, NSGTree does currently not support marker selection. Initial benchmarking showed that NSGTree is faster than SGTree (~20-50% depending on number of query faa and HMMs)
@@ -24,15 +24,15 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 * Results can be found in a subdir in <query faa dir\>/nsgt_<analysis name\>"
 
 ### Docker / Shifter
-* Shifter on NERSC Saul or Cori
+* Shifter on NERSC Perlmutter or Cori
 ```
-shifterimg pull fschulzjgi/nsgtree:0.3.3
+shifterimg pull fschulzjgi/nsgtree:0.4.0
 ```
 * Load the working directory that contains files with models, querydir and config file with shifter
 ```
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.3.3 \
+  --image=fschulzjgi/nsgtree:0.4.0 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -50,7 +50,7 @@ rfaa=$2
 configf=$3
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.3.3 \
+  --image=fschulzjgi/nsgtree:0.4.0 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -64,8 +64,8 @@ shifter \
 ```
 * For docker paths to modeldir, querydir, configfile can be loaded separately with the -v flag
 ```
-docker pull fschulzjgi/nsgtree:0.3
-docker run -t -i -v $(pwd):/nsgtree/modelsdir -v $(pwd)/test:/nsgtree/querydir --user $(id -u):$(id -g) fschulzjgi/nsgtree:0.2 snakemake --use-conda -j 16 --config qfaadir="querydir" models="/nsgtree/modelsdir/COX123.hmm"
+docker pull fschulzjgi/nsgtree:0.4.0
+docker run -t -i -v $(pwd):/nsgtree/modelsdir -v $(pwd)/test:/nsgtree/querydir --user $(id -u):$(id -g) fschulzjgi/nsgtree:0.4.0 snakemake --use-conda -j 16 --config qfaadir="querydir" models="/nsgtree/modelsdir/COX123.hmm"
 ```
 
 ## Acknowledgements

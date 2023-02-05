@@ -11,23 +11,13 @@ itolout = sys.argv[4] # name of outfile
 def get_alltaxa(t, queryids_or_pattern):
     target = []
     if os.path.isfile(queryids_or_pattern):
-        queries =get_q(queryids_or_pattern)
-        for node in t.traverse():
-            if node.is_leaf() and node.name in queries:
-                target.append(node.name)
+        with open(queryids_or_pattern, "r") as infile:
+            target = [line.strip() for line in infile]
     else:
         for node in t.traverse():
             if node.is_leaf() and node.name.startswith(queryids_or_pattern):
                 target.append(node.name)
     return target
-
-
-def get_q(queryids_or_pattern):
-    queries = []
-    with open(queryids_or_pattern, "r") as infile:
-        for line in infile:
-            queries.append(line.replace("\n", ""))
-    return queries
 
 
 def unpack_family(parentnode, leaves, target):
@@ -36,8 +26,8 @@ def unpack_family(parentnode, leaves, target):
     """
     children = parentnode.get_children()
     for child in children:
-        if child.is_leaf() and str(child).replace("--","").replace("\n","") not in leaves:
-            leaves.append(str(child).replace("--","").replace("\n",""))
+        if child.is_leaf() and child.name not in leaves:
+            leaves.append(child.name)
         else:
             unpack_family(child, leaves, target) 
     return leaves
@@ -45,13 +35,11 @@ def unpack_family(parentnode, leaves, target):
 
 def check_monophyly(node, target, mono_leaves):
     # move up one node in the tree
-    #leaves = [str(node.name)]
     parentnode = node.up
     # collect all terminal leaves under the parent node
     leaves = unpack_family(parentnode, [], target)
     if len(leaves) == len([x for x in leaves if x in target]):
         mono_leaves.extend(leaves)
-        #print (mono_leaves)
         check_monophyly(parentnode, target, mono_leaves)
     return mono_leaves
 
@@ -60,11 +48,11 @@ def main():
     target = get_alltaxa(t, queryids_or_pattern)
     mono_leaves_all = []
     for node in t.traverse():
-        if str(node.name) in target  and str(node.name) not in [x for sublist in mono_leaves_all for x in sublist]:
+        if node.name in target and node.name not in [x for sublist in mono_leaves_all for x in sublist]:
             try:
                 mono_leaves_all.append(check_monophyly(node, target, []))
             except:
-                mono_leaves_all.append([str(node.name)])
+                mono_leaves_all.append([node.name])
     #write to output
     queriesinclades = [x for sublist in mono_leaves_all for x in sublist]
     singletons = [x for x in target if x not in queriesinclades]

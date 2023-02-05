@@ -1,0 +1,22 @@
+NSGT (New SGTree)
+v0.3, January 2023
+fschulz@lbl.gov
+Fri 03 Feb 2023 08:17:53 PM PST
+models: resources/models/rnapol.hmm
+query dir: example_q
+tmethod: "fasttree" 
+rfaadir: ""
+hmmsearch_cutoff: "-E 1e-10"  
+hmmsearch_cpu: "24"
+minmarker: "0.7" 
+maxsdup: "4"  
+maxdupl: "0.3" 
+extract_processes: "8"
+ft_proteintrees: "-spr 4 -mlacc 3 -slownni -lg" 
+ft_speciestree: "-spr 4 -mlacc 3 -slownni -lg" 
+iq_proteintrees: "LG+F+I+G4" 
+iq_speciestree: "LG+F+I+G4" 
+mafft_thread: "--thread 4" 
+mafftv: "" 
+mafft: "" 
+trimal_gt: "-gt 0.1" 

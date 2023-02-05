@@ -1,0 +1,2 @@
+mafft  --quiet --thread 4 example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/analyses/hits_faa/COG0085.faa > example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/analyses/aligned/COG0085.mafft
+trimal -gt 0.1 -in example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/analyses/aligned/COG0085.mafft -out example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/analyses/aligned_t/COG0085.mafft_t

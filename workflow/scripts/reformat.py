@@ -12,10 +12,10 @@ faaoutdir = sys.argv[2]
 reformatted = []
 
 for faain in glob.glob(faaindir+"/*.faa"):
-    faaout = faaoutdir + "/" + faain.split("/")[-1]
+    faaout = os.path.join(faaoutdir, os.path.basename(faain))
     reformatted = []
     for seq_record in SeqIO.parse(faain, "fasta"):
-        querybase = faain.split("/")[-1].split(".")[0]
+        querybase = os.path.splitext(os.path.basename(faain))[0]
         if "|" in seq_record.id:
             if seq_record.id.split("|")[0] == querybase:
                 seq_record.id = seq_record.id.split()[0]

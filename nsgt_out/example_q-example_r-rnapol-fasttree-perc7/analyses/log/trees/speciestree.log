@@ -1,0 +1,21 @@
+fasttree -spr 4 -mlacc 3 -slownni -lg example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/example_q-example_r-rnapol-fasttree-perc7.mafft_t > example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/analyses/finaltree/fasttree/example_q-example_r-rnapol-fasttree-perc7.treefile
+FastTree Version 2.1.11 Double precision (No SSE3)
+Alignment: example_q/nsgt_out/example_q-example_r-rnapol-fasttree-perc7/example_q-example_r-rnapol-fasttree-perc7.mafft_t
+Amino acid distances: BLOSUM45 Joins: balanced Support: SH-like 1000
+Search: Normal +NNI +SPR (4 rounds range 10) +ML-NNI opt-each=3
+TopHits: 1.00*sqrtN close=default refresh=0.80
+ML Model: Le-Gascuel 2008, CAT approximation with 20 rate categories
+Ignored unknown character X (seen 266 times)
+Initial topology in 0.00 seconds
+Refining topology: 6 rounds ME-NNIs, 4 rounds ME-SPRs, 3 rounds ML-NNIs
+Total branch-length 0.840 after 0.00 sec
+ML-NNI round 1: LogLk = -12729.383 NNIs 0 max delta 0.00 Time 0.02
+Switched to using 20 rate categories (CAT approximation)
+Rate categories were divided by 0.674 so that average rate = 1.0
+CAT-based log-likelihoods may not be comparable across runs
+Use -gamma for approximate but comparable Gamma(20) log-likelihoods
+ML-NNI round 2: LogLk = -12366.151 NNIs 0 max delta 0.00 Time 0.05
+Turning off heuristics for final round of ML NNIs (converged)
+ML-NNI round 3: LogLk = -12366.151 NNIs 0 max delta 0.00 Time 0.05 (final)
+Optimize all lengths: LogLk = -12366.102 Time 0.06
+Total time: 0.08 seconds Unique: 3/3 Bad splits: 0/0
