@@ -1,8 +1,0 @@
-TREE_COLORS
-SEPARATOR COMMA
-DATA
-IMG2508501111,branch,#cc0000,normal,1
-IMG646311953,branch,#cc0000,normal,1
-UBA4669,branch,#cc0000,normal,1
-UBA4733,branch,#cc0000,normal,1
-UBA5177,branch,#cc0000,normal,1
