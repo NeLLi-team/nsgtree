@@ -104,7 +104,7 @@ def main():
             outfile.write(f'{taxon}\t{";".join(reasons)}\n')
 
     df.drop('sum', axis=1, inplace=True)
-    # reordered_df = reorder_cols(df)
+    reordered_df = reorder_cols(df)
     convert2itol(list(df.columns), outitol)
     df.to_csv(outitol, mode='a', header=False, sep=',', index=False)
 

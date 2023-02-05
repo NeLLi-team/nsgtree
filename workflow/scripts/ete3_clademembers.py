@@ -2,6 +2,8 @@ import sys
 from ete3 import Tree
 import ete3 as ete
 import os.path
+import warnings
+warnings.filterwarnings("ignore", ".*is with a literal.*", SyntaxWarning)
 
 treein = sys.argv[1] # tree in newick format
 queryids_or_pattern = sys.argv[2] # file with leaf names or pattern to look for leaves
