@@ -42,7 +42,7 @@ rule all:
     outdir + "/workflow.log",
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
     outdir + "/" + analysisname + ".treefile"
-    #outdir + "/analyses.tar.gz"
+   # outdir + "/analyses.tar.gz"
 
 
 rule help:
@@ -134,7 +134,7 @@ rule run_hmmsearch:
   hmmsearch to identify markers in query sequences
   """
   conda:
-    "envs/nsgt.yml"
+    "envs/nsgtt.yml"
   params:
     hmmsearch_cutoff = config["hmmsearch_cutoff"],
     hmmsearch_cpu = config["hmmsearch_cpu"]
@@ -205,7 +205,7 @@ rule align_trim:
   align extracted GVOGs together with refs
   """
   conda:
-    "envs/nsgt.yml"
+    "envs/nsgtt.yml"
   log:
     outdir + "/analyses/log/aln/{model}.log"
   params:
@@ -221,7 +221,7 @@ rule align_trim:
   shell:
     """
     (echo "mafft{params.mafftv} {params.mafft} --quiet {params.mafft_thread} {input.hitsfaa} > {output.aln}"
-    mafft{params.mafftv} {params.mafft} --quiet {params.mafft_thread} {input.hitsfaa} > {output.aln}
+    mafft{params.mafftv} {params.mafft} --quiet {params.mafft_thread} {input.hitsfaa} > {output.aln} || touch {output.aln}
     echo "trimal {params.trimal_gt} -in {output.aln} -out {output.trimmedaln}"
     trimal {params.trimal_gt} -in {output.aln} -out {output.trimmedaln} || touch {output.trimmedaln} ) >& {log}
     """
@@ -231,7 +231,7 @@ if config["tmethod"] == "fasttree":
   rule build_trees:
     """build single protein trees for each marker"""
     conda:
-      "envs/nsgt.yml"
+      "envs/nsgtt.yml"
     log:
       outdir + "/analyses/log/trees/{model}.log"
     input:
@@ -255,7 +255,7 @@ elif config["tmethod"] == "iqtree":
     build single protein trees for each marker
     """
     conda:
-      "envs/nsgt.yml"
+      "envs/nsgtt.yml"
     log:
       outdir + "/analyses/log/trees/{model}.log"
     input:
@@ -270,7 +270,7 @@ elif config["tmethod"] == "iqtree":
       """
       (echo "iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}"
       mkdir -p {params.outdirt}
-      iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}
+      iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln} || touch {params.outpath}.treefile
       cp {params.outpath}.treefile {output.tree}
       touch {output.tree}) >& {log}
       """
@@ -296,7 +296,7 @@ rule concat_aln:
 if config["tmethod"] == "fasttree":
   rule species_tree:
     conda:
-      "envs/nsgt.yml"
+      "envs/nsgtt.yml"
     log:
       outdir + "/analyses/log/trees/speciestree.log"
     params:
@@ -316,7 +316,7 @@ if config["tmethod"] == "fasttree":
 elif config["tmethod"] == "iqtree":
   rule species_tree:
     conda:
-      "envs/nsgt.yml"
+      "envs/nsgtt.yml"
     log:
       outdir + "/analyses/log/trees/speciestree.log"
     params:
