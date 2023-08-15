@@ -1,10 +1,9 @@
-from scipy.cluster import hierarchy
-import numpy as np
 import subprocess
 import sys
 import pandas as pd
 import glob
 from collections import defaultdict
+#import seaborn as sns
 import os
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -51,24 +50,33 @@ def get_markercompleteness (models, hmmout, query):
     return count_dict
 
 
-def filter_taxa(df, models, minmarker, maxsdup, maxdupl):
+def filter_taxa(df, count_dict, models, minmarker, maxsdup, maxdupl):
     """ Quality filtering"""
     filteredtaxa_dict = defaultdict(list)
     df['max'] = df.max(axis=1)
-    filtered_taxa = df[df['max'] > maxsdup].index
-    filteredtaxa_dict.update({taxon: ["maxsdup:{}".format(df.at[taxon, 'max'])] for taxon in filtered_taxa})
+    for taxon in list(df [(df['max']>maxsdup) ].index):
+        filteredtaxa_dict[taxon].append("maxsdup:" + str(df.at[taxon,'max']))
     df.drop(['max'], inplace=True, axis=1)
-    df['duplications'] = (df > 1).sum(axis=1)
-    filtered_taxa = df[df['duplications'] / len(models) > maxdupl].index
-    filteredtaxa_dict.update({taxon: ["maxdupl:{:.4f}".format(df.at[taxon, 'duplications'] / len(models))] for taxon in filtered_taxa})
+    df['duplications'] = (df>1).sum(axis=1)
+    for taxon in list(df[ (df['duplications']/len(models)>maxdupl) ].index):
+        filteredtaxa_dict[taxon].append("maxdupl:" + str(int(df.at[taxon,'duplications'])/len(models))[:4])
     df.drop(['duplications'], inplace=True, axis=1)
     df[df > 1] = 1
     df['sum'] = df.sum(axis=1)
-    filtered_taxa = df[df['sum'] < len(models) * minmarker].index
-    filteredtaxa_dict.update({taxon: ["completeness:{:.4f}".format(df.at[taxon, 'sum'] / len(models))] for taxon in filtered_taxa})
+    for taxon in list(df[ (df['sum']<len(models)*minmarker) ].index):
+        filteredtaxa_dict[taxon].append("completeness:" + str(int(df.at[taxon,'sum'])/len(models))[:4])
     return filteredtaxa_dict
 
 
+def reorder_cols(df):
+    """Reorder columns in countmatrix using clustering and return matrix in itol format"""
+    cg = sns.clustermap(df, method='ward', metric='euclidean', row_cluster=True, col_cluster=True)
+    reordered_ind = [(list(df))[x] for x in cg.dendrogram_col.reordered_ind]
+    df = df[reordered_ind]
+    return df
+
+
+# presence / absence map for markerset
 def convert2itol(flabels, outfile):
     with open(outfile, "w") as outfile:
         outfile.write("DATASET_HEATMAP\n"
@@ -82,31 +90,24 @@ def convert2itol(flabels, outfile):
                        )
 
 
-def reorder_cols(df):
-    """Reorder columns in countmatrix using hierarchical clustering"""
-    Z = hierarchy.linkage(df.T, method='ward')
-    reordered_ind = hierarchy.leaves_list(Z)
-    df = df[df.columns[reordered_ind]]
-    return df
-
-
 def main():
-    models = get_models(modelscombined)
-    taxa = get_taxa(queryfaadir)
-
-    count_dict = {query: get_markercompleteness(models, hmmout, query) for query in taxa}
+    ### get counts ###
+    count_dict = {}
+    models = get_models (modelscombined)
+    taxa = get_taxa (queryfaadir)
+    for query in taxa:
+        count_dict[query] = get_markercompleteness (models, hmmout, query)
     df = pd.DataFrame.from_dict(count_dict).T
-    df.to_csv(countout, sep='\t', index=True)
-
-    filteredtaxa_dict = filter_taxa(df, models, minmarker, maxsdup, maxdupl)
-    with open(removedtaxa, 'w') as outfile:
-        for taxon, reasons in filteredtaxa_dict.items():
-            outfile.write(f'{taxon}\t{";".join(reasons)}\n')
-
-    df.drop('sum', axis=1, inplace=True)
-    reordered_df = reorder_cols(df)
+    df.to_csv(countout, sep="\t")
+    filteredtaxa_dict = filter_taxa(df, count_dict, models, minmarker, maxsdup, maxdupl)
+    with open(removedtaxa, "w") as outfile:
+        for x, y in filteredtaxa_dict.items():
+            outfile.write(x + "\t" + ";".join(y) + "\n")
+    df = df.drop("sum", axis=1)
+    #reorder_cols(df)
     convert2itol(list(df.columns), outitol)
-    df.to_csv(outitol, mode='a', header=False, sep=',', index=False)
+    with open(outitol, "a") as outitolA:
+            df.to_csv(outitolA, header = False, sep = ",")
 
-if __name__ == '__main__':
-    main()
+
+main()

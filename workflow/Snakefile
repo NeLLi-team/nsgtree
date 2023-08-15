@@ -41,8 +41,8 @@ rule all:
   input:
     outdir + "/workflow.log",
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
-    outdir + "/" + analysisname + ".treefile",
-    outdir + "/analyses.tar.gz"
+    outdir + "/" + analysisname + ".treefile"
+    #outdir + "/analyses.tar.gz"
 
 
 rule help:
@@ -134,7 +134,7 @@ rule run_hmmsearch:
   hmmsearch to identify markers in query sequences
   """
   conda:
-    "envs/nsgtt.yml"
+    "envs/nsgt.yml"
   params:
     hmmsearch_cutoff = config["hmmsearch_cutoff"],
     hmmsearch_cpu = config["hmmsearch_cpu"]
@@ -205,7 +205,7 @@ rule align_trim:
   align extracted GVOGs together with refs
   """
   conda:
-    "envs/nsgtt.yml"
+    "envs/nsgt.yml"
   log:
     outdir + "/analyses/log/aln/{model}.log"
   params:
@@ -231,7 +231,7 @@ if config["tmethod"] == "fasttree":
   rule build_trees:
     """build single protein trees for each marker"""
     conda:
-      "envs/nsgtt.yml"
+      "envs/nsgt.yml"
     log:
       outdir + "/analyses/log/trees/{model}.log"
     input:
@@ -255,7 +255,7 @@ elif config["tmethod"] == "iqtree":
     build single protein trees for each marker
     """
     conda:
-      "envs/nsgtt.yml"
+      "envs/nsgt.yml"
     log:
       outdir + "/analyses/log/trees/{model}.log"
     input:
@@ -296,7 +296,7 @@ rule concat_aln:
 if config["tmethod"] == "fasttree":
   rule species_tree:
     conda:
-      "envs/nsgtt.yml"
+      "envs/nsgt.yml"
     log:
       outdir + "/analyses/log/trees/speciestree.log"
     params:
@@ -316,7 +316,7 @@ if config["tmethod"] == "fasttree":
 elif config["tmethod"] == "iqtree":
   rule species_tree:
     conda:
-      "envs/nsgtt.yml"
+      "envs/nsgt.yml"
     log:
       outdir + "/analyses/log/trees/speciestree.log"
     params:
