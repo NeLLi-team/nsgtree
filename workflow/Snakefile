@@ -43,7 +43,7 @@ rule all:
   input:
     {workflow_log},
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
-    outdir + "/" + analysisname + ".treefile"
+    outdir + "/" + analysisname + ".treefile",
     outdir + "/analyses.tar.gz"
 
 
