@@ -384,7 +384,8 @@ elif config["tmethod"] == "iqtree":
       cp {output[0]} {output[1]}
       """
 
-# rule cleanup:
+rule cleanup:
+  pass
 #   """
 #   intermediate files are kept including empty files, compress output 
 #   """
