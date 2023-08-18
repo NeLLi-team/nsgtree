@@ -385,7 +385,10 @@ elif config["tmethod"] == "iqtree":
       """
 
 rule cleanup:
-  pass
+  shell:
+      """
+      echo 'cleanup should happen here'
+      """
 #   """
 #   intermediate files are kept including empty files, compress output 
 #   """
