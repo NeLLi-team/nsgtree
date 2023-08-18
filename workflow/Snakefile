@@ -384,31 +384,32 @@ elif config["tmethod"] == "iqtree":
       cp {output[0]} {output[1]}
       """
 
-rule cleanup:
-  """
-  intermediate files are kept including empty files, compress output 
-  """
-  conda:
-    "envs/ete3.yml"
-  input:
-    outdir + "/" + analysisname + ".treefile",
-    expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
-  params:
-    fdir = outdir + "/analyses",
-    itoldir = outdir + "/itol",
-    q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
-    tmp_dir = outdir + "/analyses/tmp"
-  output:
-    outdir + "/analyses.tar.gz"
-  shell:
-    """
-    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
-    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
-    rm -r {params.q_faa_f_dir}
-    rm -r {params.tmp_dir}
-    find {params.fdir} -type f -empty -print -delete 
-    python workflow/scripts/cleanup.py {params.fdir} {output}
-    """
+# rule cleanup:
+#   """
+#   intermediate files are kept including empty files, compress output 
+#   """
+#   conda:
+#     "envs/ete3.yml"
+#   input:
+#     outdir + "/" + analysisname + ".treefile",
+#     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
+#   params:
+#     fdir = outdir + "/analyses",
+#     itoldir = outdir + "/itol",
+#     q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
+#     tmp_dir = outdir + "/analyses/tmp"
+#   output:
+#     outdir + "/analyses.tar.gz"
+#   shell:
+#     """
+#     if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
+#     if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
+#     sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
+#     sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
+#     sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
+#     rm -r {params.q_faa_f_dir}
+#     rm -r {params.tmp_dir}
+#     find {params.fdir} -type f -empty -print -delete 
+#     python workflow/scripts/cleanup.py {params.fdir} {output}
+#     """
+# 
