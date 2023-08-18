@@ -1,5 +1,5 @@
-##NSGT (New SGTree)
-##v0.3, January 2023
+##NSGTree (New SGTree)
+##v0.41, August 2023
 ##fschulz@lbl.gov
 """
 Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs
@@ -28,21 +28,23 @@ outdir = config["qfaadir"] + "/nsgt_out/" + analysisname
 reformatted_faa_dir = outdir + "/analyses/reformatted_faa/"
 
 args = sys.argv
-if "--configfiles" in args:
-  config_path = args[args.index("--configfiles") + 1]
+if "--configfile" in args:
+  config_path = args[args.index("--configfile") + 1]
 else:
   config_path = "workflow/config.yml"
 
 # model names
 MODELS = [line.replace("\n", "").split()[-1] for line in open(modelscombined, "r") if line.startswith("NAME")]
 
+# global log file
+workflow_log = outdir + "/workflow.log"
 
 rule all:
   input:
-    outdir + "/workflow.log",
+    {workflow_log},
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
     outdir + "/" + analysisname + ".treefile"
-   # outdir + "/analyses.tar.gz"
+    # outdir + "/analyses.tar.gz"
 
 
 rule help:
@@ -53,14 +55,17 @@ rule help:
         models = modelscombined,
         qfaa = qfaadir
     output:
-        outdir + "/workflow.log"
+        {workflow_log}
     shell:
         """
         (sed -n 's/^##//p' {input}
         date
+        echo "################################"
+        echo "Selected parameters for nsgtree"
         echo "models: {params.models}"
         echo "query dir: {params.qfaa}"
         cat {params.configf} | awk -F "#" '{{print $1}}') &> {output}
+        echo "################################" >> {output}
         """
 
 
@@ -176,6 +181,10 @@ rule run_hmmsearch_count_filter:
     """
     (echo "python workflow/scripts/hmmsearch_count_filter.py {params.faadirf} {params.modelshmm} {input.hmmsearchout} {output.hitcounts} {output.taxa_removed} {params.minmarker} {params.maxsdup} {params.maxdupl} {output.itolcounts}"
     python workflow/scripts/hmmsearch_count_filter.py {params.faadirf} {params.modelshmm} {input.hmmsearchout} {output.hitcounts} {output.taxa_removed} {params.minmarker} {params.maxsdup} {params.maxdupl} {output.itolcounts}) &> {log}
+    
+    echo "$(wc -l <{output.taxa_removed}) taxa were removed due to filtering" >> {workflow_log}
+    cat {output.taxa_removed} >> {workflow_log}
+    echo "################################" >> {workflow_log}
     """
 
 
@@ -185,9 +194,12 @@ rule extract_qhits:
   """
   conda:
     "envs/nsgt.yml"
+  log:
+    outdir + "/analyses/log/extraction/{model}.log"
   params:
     faadirf = outdir + "/analyses/reformatted_faa",
-    extract_processes = config["extract_processes"]
+    extract_processes = config["extract_processes"],
+    modelname = "{model}"
   input:
     hmmsearchout = outdir + "/analyses/hmmout/" + models_base + ".out",
     taxa_removed = outdir + "/analyses/hmmout/" + models_base + ".removedtaxa"
@@ -195,7 +207,16 @@ rule extract_qhits:
     outdir + "/analyses/hits_faa/{model}.faa"
   shell:
     """
-    python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output}
+    (echo "python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output}"
+    python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output}) &> {log}
+    declare -i protein_count
+    if [ ! -s {output} ]; then
+      protein_count=0
+    else
+      protein_count=$(grep -c ">" {output})
+    fi
+    echo "Extracted proteins from $protein_count different taxa for {params.modelname}" >> {log}
+    echo "Extracted proteins from $protein_count different taxa for {params.modelname}" >> {workflow_log}
     touch {output}
     """
 
@@ -290,6 +311,7 @@ rule concat_aln:
   shell:
     """
     (python workflow/scripts/concat.py {params.alndir} {output.concataln} || touch {output.concataln}) >& {log}
+    cat {log} >> {workflow_log}
     """
 
 
@@ -309,9 +331,23 @@ if config["tmethod"] == "fasttree":
       concattree = outdir + "/" + analysisname + ".treefile"
     shell:
       """
-      (echo "fasttree {params.speciestree} {input.concataln} > {output[0]}"
-      fasttree {params.speciestree} {input.concataln} > {output[0]}
-      cp {output[0]} {output[1]}) >& {log}
+      declare -i genome_count
+      if [ ! -s {input.concataln} ]; then
+        genome_count=0
+      else
+        genome_count=$(grep -c ">" {input.concataln})
+      fi
+
+      if [ $genome_count -le 3 ]; then
+        error_message="Too few genomes in the supermatrix alignment. Check filtering thresholds to increase numbers of genomes to be retained."
+        echo $error_message >> {log}
+        echo $error_message >&2
+        echo $error_message >> {workflow_log}
+        exit 1
+      fi
+      echo "fasttree {params.speciestree} {input.concataln} > {output[0]}" >> {log}
+      fasttree {params.speciestree} {input.concataln} > {output[0]} >> {log} 2>&1
+      cp {output[0]} {output[1]}
       """
 elif config["tmethod"] == "iqtree":
   rule species_tree:
@@ -329,11 +365,24 @@ elif config["tmethod"] == "iqtree":
       concattree = outdir + "/" + analysisname + ".treefile"
     shell:
       """
-      (echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}"
-      iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}
-      cp {output[0]} {output[1]}) >& {log}
-      """
+      declare -i genome_count
+      if [ ! -s {input.concataln} ]; then
+        genome_count=0
+      else
+        genome_count=$(grep -c ">" {input.concataln})
+      fi
 
+      if [ $genome_count -le 3 ]; then
+        error_message="Too few genomes in the supermatrix alignment. Check filtering thresholds to increase numbers of genomes to be retained."
+        echo $error_message >> {log}
+        echo $error_message >&2
+        echo $error_message >> {workflow_log}
+        exit 1
+      fi
+      echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}" >> {log}
+      iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln} >> {log} 2>&1
+      cp {output[0]} {output[1]}
+      """
 
 rule cleanup:
   """
@@ -355,9 +404,9 @@ rule cleanup:
     """
     if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
     if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
     sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt ; fi
+    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
     rm -r {params.q_faa_f_dir}
     rm -r {params.tmp_dir}
     find {params.fdir} -type f -empty -print -delete 
