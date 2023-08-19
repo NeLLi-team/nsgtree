@@ -8,76 +8,63 @@ New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy c
 
 ## How to run it
 
-### Workflow
+Clone the repository:
 
-* Snakemake in a conda environment
-* Input is a dir with faa files and a single file that contains a set of HMMs to identify makers
+```bash
+git clone https://github.com/NeLLi-team/nsgtree.git
+cd nsgtree
+```
+
+Create a Snakemake conda (mamba) environment:
+
+```bash
+mamba create -n snakemake snakemake
+```
+
+Activate the Snakemake environment:
+
+```bash
+mamba activate snakemake
+```
+
+Run test 1 (make sure you are inside the `nsgtree` folder):
 
 ```bash
 snakemake -j 8 --use-conda --config qfaadir="example" models="resources/models/rnapol.hmm" --configfile user_config.yml
 ```
 
-or more general
+In general, this are the required arguments to run `nsgtree`:
 
 ```bash
-snakemake -j <number of processes> --use-conda --config qfaadir="<dir with query faa>" models="<single file that contains all marker HMMs" --configfile <settings specified in user_config.yml>
+snakemake \
+  -j <number of processes> \
+  --use-conda \
+  --config \
+  qfaadir="<dir with query faa>" \
+  models="<single file that contains all marker HMMs" \
+  --configfile <settings specified in user_config.yml>
 ```
 
 * Alternatively, inputs can be a dir with query faa files and a dir with reference faa files, output dir will be created in the dir with query faa files
 
 ```bash
-snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" models="resources/models/rnapol.hmm" --configfile user_config.yml
+snakemake \
+  -j 24 \
+  --use-conda \
+  --config \
+  rfaadir="example_r"  \
+  qfaadir="example_q" \
+  models="resources/models/rnapol.hmm" \
+  --configfile user_config.yml
 ```
+
+## Notes
 
 * Setting for alignment, trimming and tree building can be changed in user_config.yml
 * Several sets of marker HMMs are provided in subdir resources/models/
 * Results can be found in a subdir in <query faa dir\>/nsgt_<analysis name\>"
 
-### Docker / Shifter
-
-* Shifter on NERSC Perlmutter or Cori
-
-```bash
-shifterimg pull fschulzjgi/nsgtree:0.4.1
-```
-
-* Load the working directory that contains files with models, querydir and config file with shifter
-
-```bash
-shifter \
-  --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.4.1 \
-  bash -c \
-  "snakemake --snakefile /nsgtree/workflow/Snakefile \
-  -j 24 \
-  --use-conda \
-  --config \
-  qfaadir="/nsgtree/example/test" \
-  models="/nsgtree/example/rnapol.hmm" \
-  --conda-prefix /nsgtree/.snakemake/conda \
-  --configfile /nsgtree/example/user_config.yml"
-```
-
-* Specify ref dir and query dir and config file with shifter, using the UNI56 models provided by nsgtree
-
-```bash
-qfaa=$1
-rfaa=$2
-configf=$3
-shifter \
-  --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.4.0 \
-  bash -c \
-  "snakemake --snakefile /nsgtree/workflow/Snakefile \
-  -j 24 \
-  --use-conda \
-  --config \
-  qfaadir="/nsgtree/example/$qfaa" \
-  rfaadir="/nsgtree/example/$rfaa" \
-  models="/nsgtree/resources/models/UNI56.hmm" \
-  --conda-prefix /nsgtree/.snakemake/conda \
-  --configfile /nsgtree/example/$configf"
-```
+### Docker
 
 * For docker paths to modeldir, querydir, configfile can be loaded separately with the -v flag
 
