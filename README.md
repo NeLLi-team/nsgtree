@@ -1,5 +1,5 @@
 # nsgtree
-_v0.4.2 August 18 2023_
+_v0.4.3 August 19 2023_
 
 ## Why use NSGTree (over SGTree)
 New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user provided genomes and a set of phylogenetic markers. NSGTree builds a species tree based on a concatenated alignment of all proteins that were identified with the provided markers HMMs. NSGTree also builds single protein trees for every marker protein that was found. It is a highly simplified version of SGTree. In contrast to SGTree, NSGTree does currently not support marker selection. Initial benchmarking showed that NSGTree is faster than SGTree (~20-50% depending on number of query faa and HMMs)
@@ -23,16 +23,33 @@ snakemake -j 24 --use-conda --config rfaadir="example_r"  qfaadir="example_q" mo
 * Several sets of marker HMMs are provided in subdir resources/models/
 * Results can be found in a subdir in <query faa dir\>/nsgt_<analysis name\>"
 
-### Docker / Shifter
-* Shifter on NERSC Perlmutter or Cori
+### Apptainer / Shifter
+* Apptainer: save the following into a run.sh script, specify path to dirs and config file as command line arguments, potentially edit further to specify different set of HMMs, adjust -j flag depending on available resources 
 ```
-shifterimg pull fschulzjgi/nsgtree:0.4.2
+LOCAL_FOLDER_WITH_QFAA_FILES=$1
+LOCAL_FOLDER_WITH_RFAA_FILES=$2
+USER_CONFIG=$3
+apptainer run \
+	docker://docker.io/fschulzjgi/nsgtree:0.4.3 \
+	snakemake -j 16 \
+	--snakefile "/nsgtree/workflow/Snakefile" \
+	--use-conda \
+	--config \
+	qfaadir="$LOCAL_FOLDER_WITH_QFAA_FILES" \
+	rfaadir="$LOCAL_FOLDER_WITH_RFAA_FILES" \
+	models="/nsgtree/resources/models/rnapol.hmm" \
+	--conda-prefix "/nsgtree/.snakemake/conda" \
+	--configfile $USER_CONFIG
+```
+* Shifter on NERSC Perlmutter
+```
+shifterimg pull fschulzjgi/nsgtree:0.4.3
 ```
 * Load the working directory that contains files with models, querydir and config file with shifter
 ```
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.4.2 \
+  --image=fschulzjgi/nsgtree:0.4.3 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -50,7 +67,7 @@ rfaa=$2
 configf=$3
 shifter \
   --volume=$(pwd):/nsgtree/example \
-  --image=fschulzjgi/nsgtree:0.4.2 \
+  --image=fschulzjgi/nsgtree:0.4.3 \
   bash -c \
   "snakemake --snakefile /nsgtree/workflow/Snakefile \
   -j 24 \
@@ -64,8 +81,8 @@ shifter \
 ```
 * For docker paths to modeldir, querydir, configfile can be loaded separately with the -v flag
 ```
-docker pull fschulzjgi/nsgtree:0.4.2
-docker run -t -i -v $(pwd):/nsgtree/modelsdir -v $(pwd)/test:/nsgtree/querydir --user $(id -u):$(id -g) fschulzjgi/nsgtree:0.4.2 snakemake --use-conda -j 16 --config qfaadir="querydir" models="/nsgtree/modelsdir/rnapol.hmm"
+docker pull fschulzjgi/nsgtree:0.4.3
+docker run -t -i -v $(pwd):/nsgtree/modelsdir -v $(pwd)/test:/nsgtree/querydir --user $(id -u):$(id -g) fschulzjgi/nsgtree:0.4.3 snakemake --use-conda -j 16 --config qfaadir="querydir" models="/nsgtree/modelsdir/rnapol.hmm"
 ```
 
 ## Acknowledgements
