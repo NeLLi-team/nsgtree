@@ -43,8 +43,8 @@ rule all:
   input:
     {workflow_log},
     expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
-    outdir + "/" + analysisname + ".treefile" #,
-    # outdir + "/analyses.tar.gz"
+    outdir + "/" + analysisname + ".treefile",
+    outdir + "/analyses.tar.gz"
 
 
 rule help:
@@ -92,11 +92,12 @@ if config["rfaadir"]:
     shell:
       """
       mkdir -p {output.reformatted_faa_dir}
-      cp {input.qdir}/*.faa {input.rdir}/*.faa {output.reformatted_faa_dir}
+      #cp {input.qdir}/*.faa {input.rdir}/*.faa {output.reformatted_faa_dir}
       echo "TREE_COLORS\nSEPARATOR COMMA\nDATA" > {output.q_colors_itol}
       ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1",branch,#cc0000,normal,1"}}' >> {output.q_colors_itol}
       ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1}}' > {output.queries}
       python workflow/scripts/reformat.py {input.rdir} {output.reformatted_faa_dir}
+      python workflow/scripts/reformat.py {input.qdir} {output.reformatted_faa_dir}
       """
 else:
   FAABASENAMES = [x.stem for x in qfaadir.iterdir() if x.is_file() and x.suffix in [".faa"]]
@@ -131,6 +132,8 @@ rule merge_qfaa:
   shell:
     """
     cat {params.faadirf}/*.faa > {output.faacombined}
+    echo "Number of genomes in the analysis: $(find {params.faadirf} -type f -name '*.faa' | wc -l)" >> {workflow_log}
+    echo "################################" >> {workflow_log}
     """
 
 
@@ -181,10 +184,8 @@ rule run_hmmsearch_count_filter:
     """
     (echo "python workflow/scripts/hmmsearch_count_filter.py {params.faadirf} {params.modelshmm} {input.hmmsearchout} {output.hitcounts} {output.taxa_removed} {params.minmarker} {params.maxsdup} {params.maxdupl} {output.itolcounts}"
     python workflow/scripts/hmmsearch_count_filter.py {params.faadirf} {params.modelshmm} {input.hmmsearchout} {output.hitcounts} {output.taxa_removed} {params.minmarker} {params.maxsdup} {params.maxdupl} {output.itolcounts}) &> {log}
-    
-    echo "$(wc -l <{output.taxa_removed}) taxa were removed due to filtering" >> {workflow_log}
+    echo "Number of genomes that were removed due to filtering thresholds: $(wc -l <{output.taxa_removed}) " >> {workflow_log}
     cat {output.taxa_removed} >> {workflow_log}
-    echo "################################" >> {workflow_log}
     """
 
 
@@ -216,7 +217,6 @@ rule extract_qhits:
       protein_count=$(grep -c ">" {output})
     fi
     echo "Extracted proteins from $protein_count different taxa for {params.modelname}" >> {log}
-    echo "Extracted proteins from $protein_count different taxa for {params.modelname}" >> {workflow_log}
     touch {output}
     """
 
@@ -259,8 +259,8 @@ if config["tmethod"] == "fasttree":
       trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
     params:
       proteintrees = config["ft_proteintrees"],
-      outdirt = outdir + "/analyses/proteintrees/fasttree",
-      outpath = outdir + "/analyses/proteintrees/fasttree/{model}"
+      outdirt = outdir + "/analyses/proteintrees/",
+      outpath = outdir + "/analyses/proteintrees/{model}"
     output:
       tree = outdir + "/proteintrees/{model}.treefile"
     shell:
@@ -311,7 +311,8 @@ rule concat_aln:
   shell:
     """
     (python workflow/scripts/concat.py {params.alndir} {output.concataln} || touch {output.concataln}) >& {log}
-    cat {log} >> {workflow_log}
+    echo "################################" >> {workflow_log}
+    echo "Number of genomes in the final alignment: $(grep -c '>' {output.concataln})" >> {workflow_log}
     """
 
 
@@ -346,7 +347,7 @@ if config["tmethod"] == "fasttree":
         exit 1
       fi
       echo "fasttree {params.speciestree} {input.concataln} > {output[0]}" >> {log}
-      fasttree {params.speciestree} {input.concataln} > {output[0]} >> {log} 2>&1
+      fasttree {params.speciestree} {input.concataln} > {output[0]} 
       cp {output[0]} {output[1]}
       """
 elif config["tmethod"] == "iqtree":
@@ -384,32 +385,31 @@ elif config["tmethod"] == "iqtree":
       cp {output[0]} {output[1]}
       """
 
-#rule cleanup:
-#  """
-#  intermediate files are kept including empty files, compress output 
-#  """
-#  conda:
-#    "envs/ete3.yml"
-#  input:
-#    outdir + "/" + analysisname + ".treefile",
-#    expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
-#  params:
-#    fdir = outdir + "/analyses",
-#    itoldir = outdir + "/itol",
-#    q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
-#    tmp_dir = outdir + "/analyses/tmp"
-#  output:
-#    outdir + "/analyses.tar.gz"
-#  shell:
-#    """
-#    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
-#    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
-#    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
-#    sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
-#    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
-#    rm -r {params.q_faa_f_dir}
-#    rm -r {params.tmp_dir}
-#    find {params.fdir} -type f -empty -print -delete 
-#    python workflow/scripts/cleanup.py {params.fdir} {output}
-#    """
-#
+rule cleanup:
+  """
+  intermediate files are kept including empty files, compress output 
+  """
+  conda:
+    "envs/ete3.yml"
+  input:
+    outdir + "/" + analysisname + ".treefile",
+    expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
+  params:
+    fdir = outdir + "/analyses",
+    itoldir = outdir + "/itol",
+    q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
+    tmp_dir = outdir + "/analyses/tmp"
+  output:
+    outdir + "/analyses.tar.gz"
+  shell:
+    """
+    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
+    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
+    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
+    rm -r {params.q_faa_f_dir}
+    rm -r {params.tmp_dir}
+    find {params.fdir} -type f -empty -print -delete 
+    python workflow/scripts/cleanup.py {params.fdir} {output}
+    """
