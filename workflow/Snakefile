@@ -1,5 +1,5 @@
 ##NSGTree (New SGTree)
-##v0.41, August 2023
+##v0.42, August 2023
 ##fschulz@lbl.gov
 """
 Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs
@@ -25,6 +25,8 @@ analysisname = str(qfaadir_base + \
     "-" + config["tmethod"] + \
     "-perc" + str(int(float(config["minmarker"])*10))).replace(".", "")
 outdir = config["qfaadir"] + "/nsgt_out/" + analysisname
+os.makedirs(outdir, exist_ok=True)
+
 reformatted_faa_dir = outdir + "/analyses/reformatted_faa/"
 
 args = sys.argv
@@ -46,28 +48,26 @@ rule all:
     outdir + "/" + analysisname + ".treefile",
     outdir + "/analyses.tar.gz"
 
-
 rule help:
-    input: 
-        "workflow/Snakefile"
-    params:
-        configf = config_path,
-        models = modelscombined,
-        qfaa = qfaadir
-    output:
-        workflow_log = workflow_log
-    shell:
-        """
-        mkdir -p {os.path.dirname(output.workflow_log)}
-        (sed -n 's/^##//p' {input}
-        date
-        echo "################################"
-        echo "Selected parameters for nsgtree"
-        echo "models: {params.models}"
-        echo "query dir: {params.qfaa}"
-        cat {params.configf} | awk -F "#" '{{print $1}}') &> {output.workflow_log}
-        echo "################################" >> {output.workflow_log}
-        """
+  input: 
+    "workflow/Snakefile"
+  params:
+    configf = config_path,
+    models = modelscombined,
+    qfaa = qfaadir
+  output:
+    {workflow_log}
+  shell:
+    """
+    (sed -n 's/^##//p' {input}
+    date
+    echo "################################"
+    echo "Selected parameters for nsgtree"
+    echo "models: {params.models}"
+    echo "query dir: {params.qfaa}"
+    cat {params.configf} | awk -F "#" '{{print $1}}') &> {output}
+    echo "################################" >> {output}
+    """
 
 if config["rfaadir"]:
   rfaadir = Path(config["rfaadir"])
