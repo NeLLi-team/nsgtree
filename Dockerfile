@@ -7,7 +7,7 @@ WORKDIR /tmp/nsgtree
 
 COPY . /tmp/nsgtree
 
-ENV PATH=${PATH}:$HOME/nsgtree
+ENV PATH=${PATH}:/tmp/nsgtree
 
 # Pre-create all conda environments and pre-install all conda packages
 RUN snakemake \
