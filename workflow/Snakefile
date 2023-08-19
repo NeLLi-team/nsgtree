@@ -55,19 +55,19 @@ rule help:
         models = modelscombined,
         qfaa = qfaadir
     output:
-        {workflow_log}
+        workflow_log = workflow_log
     shell:
         """
+        mkdir -p {os.path.dirname(output.workflow_log)}
         (sed -n 's/^##//p' {input}
         date
         echo "################################"
         echo "Selected parameters for nsgtree"
         echo "models: {params.models}"
         echo "query dir: {params.qfaa}"
-        cat {params.configf} | awk -F "#" '{{print $1}}') &> {output}
-        echo "################################" >> {output}
+        cat {params.configf} | awk -F "#" '{{print $1}}') &> {output.workflow_log}
+        echo "################################" >> {output.workflow_log}
         """
-
 
 if config["rfaadir"]:
   rfaadir = Path(config["rfaadir"])
