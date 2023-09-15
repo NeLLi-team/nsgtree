@@ -1,6 +1,6 @@
 tmethod: "fasttree" # iqtree
 rfaadir: ""
-hmmsearch_cutoff: "-E 1e-10"  # e.g.  "-E 1e-10", "--cut_ga" or something else , for UNI56 use --cut_ga
+hmmsearch_cutoff: "--cut_ga"  # e.g.  "-E 1e-10", "--cut_ga" or something else , for UNI56 use --cut_ga
 hmmsearch_cpu: "8"
 minmarker: "0.1" # 50 percent of markers need to be present
 maxsdup: "4"  # genome will be removed if at least one marker is present in more than n copies
