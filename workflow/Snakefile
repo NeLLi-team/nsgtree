@@ -249,7 +249,9 @@ rule align_trim:
 
 if config["tmethod"] == "fasttree":
   rule build_trees:
-    """build single protein trees for each marker"""
+    """
+    build single protein trees for each marker
+    """
     conda:
       "envs/nsgtt.yml"
     log:
@@ -258,11 +260,11 @@ if config["tmethod"] == "fasttree":
       trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
     params:
       proteintrees = config["ft_proteintrees"],
-      outdirt = outdir + "/analyses/proteintrees/",
-      outpath = outdir + "/analyses/proteintrees/{model}"
+      outdirt = outdir + "/analyses/proteintrees/fasttree",
+      outpath = outdir + "/analyses/proteintrees/fasttree/{model}"
     output:
       tree = outdir + "/proteintrees/{model}.treefile",
-      complete_flag = outdir + "/proteintrees/{model}.complete"
+      complete_flag = outdir + "/analyses/proteintrees/fasttree/{model}.complete"
     shell:
       """
       (echo "fasttree {params.proteintrees} {input.trimmedaln} > {output.tree}"
@@ -402,29 +404,55 @@ elif config["tmethod"] == "iqtree":
       fi  
       touch {output.complete_flag}      
       """
-
-rule cleanup:
-  """
-  intermediate files are kept including empty files, compress output 
-  """
-  conda:
-    "envs/ete3.yml"
-  input:
-    outdir + "/analyses/finaltree/iqtree/" + analysisname + ".complete",
-    outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
-    expand(outdir + "/analyses/proteintrees/iqtree/{model}.complete", model=MODELS)
-  params:
-    fdir = outdir + "/analyses",
-    itoldir = outdir + "/itol",
-    q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
-    tmp_dir = outdir + "/analyses/tmp"
-  output:
-    outdir + "/analyses.tar.gz"
-  shell:
+if config["tmethod"] == "fasttree":
+  rule cleanup:
     """
-    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[1]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
-    rm -r {params.q_faa_f_dir}
-    rm -r {params.tmp_dir}
-    find {params.fdir} -type f -empty -print -delete 
-    python workflow/scripts/cleanup.py {params.fdir} {output}
+    intermediate files are kept including empty files, compress output 
     """
+    conda:
+      "envs/ete3.yml"
+    input:
+      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".complete",
+      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".treefile",
+      expand(outdir + "/analyses/proteintrees/fasttree/{model}.complete", model=MODELS)
+    params:
+      fdir = outdir + "/analyses",
+      itoldir = outdir + "/itol",
+      q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
+      tmp_dir = outdir + "/analyses/tmp"
+    output:
+      outdir + "/analyses.tar.gz"
+    shell:
+      """
+      if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[1]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
+      rm -r {params.q_faa_f_dir}
+      rm -r {params.tmp_dir}
+      find {params.fdir} -type f -empty -print -delete 
+      python workflow/scripts/cleanup.py {params.fdir} {output}
+      """
+elif config["tmethod"] == "iqtree":
+  rule cleanup:
+    """
+    intermediate files are kept including empty files, compress output 
+    """
+    conda:
+      "envs/ete3.yml"
+    input:
+      outdir + "/analyses/finaltree/iqtree/" + analysisname + ".complete",
+      outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
+      expand(outdir + "/analyses/proteintrees/iqtree/{model}.complete", model=MODELS)
+    params:
+      fdir = outdir + "/analyses",
+      itoldir = outdir + "/itol",
+      q_faa_f_dir = outdir + "/analyses/reformatted_faa/",
+      tmp_dir = outdir + "/analyses/tmp"
+    output:
+      outdir + "/analyses.tar.gz"
+    shell:
+      """
+      if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[1]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
+      rm -r {params.q_faa_f_dir}
+      rm -r {params.tmp_dir}
+      find {params.fdir} -type f -empty -print -delete 
+      python workflow/scripts/cleanup.py {params.fdir} {output}
+      """
