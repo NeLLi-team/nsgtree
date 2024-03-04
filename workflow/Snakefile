@@ -263,7 +263,7 @@ if config["tmethod"] == "fasttree":
       outdirt = outdir + "/analyses/proteintrees/fasttree",
       outpath = outdir + "/analyses/proteintrees/fasttree/{model}"
     output:
-      tree = outdir + "/analyses/proteintrees/fasttree/{model}.treefile",
+      tree = outdir + "/proteintrees/{model}.treefile",
       complete_flag = outdir + "/analyses/proteintrees/fasttree/{model}.complete"
     shell:
       """
