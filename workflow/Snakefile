@@ -1,5 +1,5 @@
 ##NSGTree (New SGTree)
-##v0.43, August 2023
+##v0.5, March 2024
 ##fschulz@lbl.gov
 """
 Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs
