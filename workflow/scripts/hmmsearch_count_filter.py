@@ -69,6 +69,13 @@ def filter_taxa(df, models, minmarker, maxsdup, maxdupl):
     return filteredtaxa_dict
 
 
+def reorder_cols(df):
+    """Reorder columns in countmatrix using hierarchical clustering"""
+    Z = hierarchy.linkage(df.T, method='ward')
+    reordered_ind = hierarchy.leaves_list(Z)
+    df = df[df.columns[reordered_ind]]
+    return df
+
 def convert2itol(flabels, outfile):
     with open(outfile, "w") as outfile:
         outfile.write("DATASET_HEATMAP\n"
@@ -80,15 +87,6 @@ def convert2itol(flabels, outfile):
                         "FIELD_LABELS," + ",".join(flabels) + "\n"
                         "DATA\n"
                        )
-
-
-def reorder_cols(df):
-    """Reorder columns in countmatrix using hierarchical clustering"""
-    Z = hierarchy.linkage(df.T, method='ward')
-    reordered_ind = hierarchy.leaves_list(Z)
-    df = df[df.columns[reordered_ind]]
-    return df
-
 
 def main():
     models = get_models(modelscombined)

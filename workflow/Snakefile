@@ -44,8 +44,6 @@ workflow_log = outdir + "/workflow.log"
 rule all:
   input:
     {workflow_log},
-    expand(outdir + "/proteintrees/{model}.treefile", model=MODELS),
-    outdir + "/" + analysisname + ".treefile",
     outdir + "/analyses.tar.gz"
 
 rule help:
@@ -93,9 +91,9 @@ if config["rfaadir"]:
       """
       mkdir -p {output.reformatted_faa_dir}
       #cp {input.qdir}/*.faa {input.rdir}/*.faa {output.reformatted_faa_dir}
-      echo "TREE_COLORS\nSEPARATOR COMMA\nDATA" > {output.q_colors_itol}
-      ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1",branch,#cc0000,normal,1"}}' >> {output.q_colors_itol}
-      ls {input.qdir} | grep -v "nsgt" | awk -F "." '{{print $1}}' > {output.queries}
+      echo "DATASET_COLORSTRIP\nSEPARATOR COMMA\nDATASET_LABEL,queries\nCOLOR,#cc0000\nCOLOR_BRANCHES,1\nDATA" > {output.q_colors_itol}
+      ls {input.qdir} | grep -v "nsgt" | awk -F ".f" '{{print $1",#cc0000,queries"}}' >> {output.q_colors_itol}
+      ls {input.qdir} | grep -v "nsgt" | awk -F ".f" '{{print $1}}' > {output.queries}
       python workflow/scripts/reformat.py {input.rdir} {output.reformatted_faa_dir}
       python workflow/scripts/reformat.py {input.qdir} {output.reformatted_faa_dir}
       """
@@ -200,7 +198,8 @@ rule extract_qhits:
   params:
     faadirf = outdir + "/analyses/reformatted_faa",
     extract_processes = config["extract_processes"],
-    modelname = "{model}"
+    modelname = "{model}",
+    lengthfilter = config["lengthfilter"]
   input:
     hmmsearchout = outdir + "/analyses/hmmout/" + models_base + ".out",
     taxa_removed = outdir + "/analyses/hmmout/" + models_base + ".removedtaxa"
@@ -208,8 +207,8 @@ rule extract_qhits:
     outdir + "/analyses/hits_faa/{model}.faa"
   shell:
     """
-    (echo "python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output}"
-    python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output}) &> {log}
+    (echo "python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output} {params.lengthfilter}"
+    python workflow/scripts/extract_qhits.py {input.hmmsearchout} {params.faadirf} {params.extract_processes} {input.taxa_removed} {output} {params.lengthfilter}) &> {log}
     declare -i protein_count
     if [ ! -s {output} ]; then
       protein_count=0
@@ -262,12 +261,14 @@ if config["tmethod"] == "fasttree":
       outdirt = outdir + "/analyses/proteintrees/",
       outpath = outdir + "/analyses/proteintrees/{model}"
     output:
-      tree = outdir + "/proteintrees/{model}.treefile"
+      tree = outdir + "/proteintrees/{model}.treefile",
+      complete_flag = outdir + "/proteintrees/{model}.complete"
     shell:
       """
       (echo "fasttree {params.proteintrees} {input.trimmedaln} > {output.tree}"
       mkdir -p {params.outdirt}
       fasttree {params.proteintrees} {input.trimmedaln} > {params.outpath}.treefile || touch {output.tree}
+      touch {output.complete_flag}
       cp {params.outpath}.treefile {output.tree}) >& {log}
       """
 elif config["tmethod"] == "iqtree":
@@ -283,17 +284,25 @@ elif config["tmethod"] == "iqtree":
       trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
     params:
       proteintrees = config["iq_proteintrees"],
+      foutdirt = outdir + "/proteintrees/",
       outdirt = outdir + "/analyses/proteintrees/iqtree",
+      ctree = outdir + "/proteintrees/{model}.contree",
+      ptree = outdir + "/proteintrees/{model}.treefile",
       outpath = outdir + "/analyses/proteintrees/iqtree/{model}"
     output:
-      tree = outdir + "/proteintrees/{model}.treefile"
+      outdir + "/analyses/proteintrees/iqtree/{model}.complete"
     shell:
       """
       (echo "iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln}"
       mkdir -p {params.outdirt}
-      iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -fast -s {input.trimmedaln} || touch {params.outpath}.treefile
-      cp {params.outpath}.treefile {output.tree}
-      touch {output.tree}) >& {log}
+      mkdir -p {params.foutdirt}
+      iqtree --prefix {params.outpath} -m {params.proteintrees} -T 1 -s {input.trimmedaln} || touch {params.outpath}.treefile && touch {output}
+      if [ -f "{params.outpath}.contree" ]; then
+          cp "{params.outpath}.contree" "{params.ctree}"
+      else
+          cp "{params.outpath}.treefile" "{params.ptree}"
+      fi
+      touch {output}) >& {log}
       """
 
 
@@ -329,7 +338,8 @@ if config["tmethod"] == "fasttree":
       concataln = outdir + "/" + analysisname + ".mafft_t"
     output:
       outdir + "/analyses/finaltree/fasttree/" + analysisname + ".treefile",
-      concattree = outdir + "/" + analysisname + ".treefile"
+      concattree = outdir + "/" + analysisname + ".treefile",
+      complete_flag = outdir + "/analyses/finaltree/fasttree/" + analysisname + ".complete"
     shell:
       """
       declare -i genome_count
@@ -348,7 +358,8 @@ if config["tmethod"] == "fasttree":
       fi
       echo "fasttree {params.speciestree} {input.concataln} > {output[0]}" >> {log}
       fasttree {params.speciestree} {input.concataln} > {output[0]} 
-      cp {output[0]} {output[1]}
+      cp {output[0]} {output.concattree}
+      touch {output.complete_flag}
       """
 elif config["tmethod"] == "iqtree":
   rule species_tree:
@@ -358,12 +369,15 @@ elif config["tmethod"] == "iqtree":
       outdir + "/analyses/log/trees/speciestree.log"
     params:
       speciestree = config["iq_speciestree"],
+      contree = outdir + "/analyses/finaltree/iqtree/" + analysisname + ".contree",
+      fcontree = outdir + "/" + analysisname + ".contree",
       outpath = outdir + "/analyses/finaltree/iqtree/" + analysisname
     input:
       concataln = outdir + "/" + analysisname + ".mafft_t"
     output:
       outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
-      concattree = outdir + "/" + analysisname + ".treefile"
+      concattree = outdir + "/" + analysisname + ".treefile",
+      complete_flag = outdir + "/analyses/finaltree/iqtree/" + analysisname + ".complete"
     shell:
       """
       declare -i genome_count
@@ -377,12 +391,16 @@ elif config["tmethod"] == "iqtree":
         error_message="Too few genomes in the supermatrix alignment. Check filtering thresholds to increase numbers of genomes to be retained."
         echo $error_message >> {log}
         echo $error_message >&2
-        echo $error_message >> {workflow_log}
         exit 1
       fi
-      echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln}" >> {log}
-      iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -fast -s {input.concataln} >> {log} 2>&1
-      cp {output[0]} {output[1]}
+      echo "iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -s {input.concataln}" >> {log}
+      iqtree --quiet --prefix {params.outpath} -m {params.speciestree} -s {input.concataln} >> {log} 2>&1
+      cp {params.outpath}.treefile {output.concattree}  
+      # Check if the .contree file exists and copy it if it does
+      if [ -f "{params.outpath}.contree" ]; then
+        cp "{params.outpath}.contree" "{params.fcontree}"
+      fi  
+      touch {output.complete_flag}      
       """
 
 rule cleanup:
@@ -392,8 +410,9 @@ rule cleanup:
   conda:
     "envs/ete3.yml"
   input:
-    outdir + "/" + analysisname + ".treefile",
-    expand(outdir + "/proteintrees/{model}.treefile", model=MODELS)
+    outdir + "/analyses/finaltree/iqtree/" + analysisname + ".complete",
+    outdir + "/analyses/finaltree/iqtree/" + analysisname + ".treefile",
+    expand(outdir + "/analyses/proteintrees/iqtree/{model}.complete", model=MODELS)
   params:
     fdir = outdir + "/analyses",
     itoldir = outdir + "/itol",
@@ -403,11 +422,7 @@ rule cleanup:
     outdir + "/analyses.tar.gz"
   shell:
     """
-    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[0]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
-    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_clademembers.py {input[0]} {params.itoldir}/queries.txt cc0000 {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\DATA' {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\SEPARATOR COMMA' {params.itoldir}/clademembers_colored.itol.txt
-    sed -i '1 i\TREE_COLOR' {params.itoldir}/clademembers_colored.itol.txt ; fi
+    if [ -e {params.itoldir}/queries.txt ]; then python workflow/scripts/ete3_nntree.py {input[1]} {params.itoldir}/queries.txt {params.itoldir}/nn.itol.txt ; fi
     rm -r {params.q_faa_f_dir}
     rm -r {params.tmp_dir}
     find {params.fdir} -type f -empty -print -delete 

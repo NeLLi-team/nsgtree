@@ -1,5 +1,5 @@
 # nsgtree
-_v0.4.3 August 19 2023_
+_v0.5 March 3 2024_
 
 ## Why use NSGTree (over SGTree)
 New Simple Genome Tree (NSGTree) is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user provided genomes and a set of phylogenetic markers. NSGTree builds a species tree based on a concatenated alignment of all proteins that were identified with the provided markers HMMs. NSGTree also builds single protein trees for every marker protein that was found. It is a highly simplified version of SGTree. In contrast to SGTree, NSGTree does currently not support marker selection. Initial benchmarking showed that NSGTree is faster than SGTree (~20-50% depending on number of query faa and HMMs)
