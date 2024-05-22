@@ -247,7 +247,7 @@ rule align_trim:
     """
 
 
-if config["tmethod"] == "fasttree":
+if config["tmethod"] == "vfasttree":
   rule build_trees:
     """
     build single protein trees for each marker
@@ -260,16 +260,17 @@ if config["tmethod"] == "fasttree":
       trimmedaln = outdir + "/analyses/aligned_t/{model}.mafft_t"
     params:
       proteintrees = config["ft_proteintrees"],
-      outdirt = outdir + "/analyses/proteintrees/fasttree",
-      outpath = outdir + "/analyses/proteintrees/fasttree/{model}"
+      outdirt = outdir + "/analyses/proteintrees/vfasttree",
+      outpath = outdir + "/analyses/proteintrees/vfasttree/{model}"
+      tree_cpus = config["tree_cpus"]
     output:
       tree = outdir + "/proteintrees/{model}.treefile",
-      complete_flag = outdir + "/analyses/proteintrees/fasttree/{model}.complete"
+      complete_flag = outdir + "/analyses/proteintrees/vfasttree/{model}.complete"
     shell:
       """
-      (echo "fasttree {params.proteintrees} {input.trimmedaln} > {output.tree}"
+      (echo "VeryFastTree -threads {params.tree_cpus} {params.proteintrees} {input.trimmedaln} > {output.tree}"
       mkdir -p {params.outdirt}
-      fasttree {params.proteintrees} {input.trimmedaln} > {params.outpath}.treefile || touch {output.tree}
+      VeryFastTree -threads {params.tree_cpus} {params.proteintrees} {input.trimmedaln} > {params.outpath}.treefile || touch {output.tree}
       touch {output.complete_flag}
       cp {params.outpath}.treefile {output.tree}) >& {log}
       """
@@ -327,7 +328,7 @@ rule concat_aln:
     """
 
 
-if config["tmethod"] == "fasttree":
+if config["tmethod"] == "vfasttree":
   rule species_tree:
     conda:
       "envs/nsgtt.yml"
@@ -335,13 +336,14 @@ if config["tmethod"] == "fasttree":
       outdir + "/analyses/log/trees/speciestree.log"
     params:
       speciestree = config["ft_speciestree"],
-      outpath = outdir + "/analyses/finaltree/fasttree/" + analysisname
+      outpath = outdir + "/analyses/finaltree/vfasttree/" + analysisname
+      tree_cpus = config["tree_cpus"]
     input:
       concataln = outdir + "/" + analysisname + ".mafft_t"
     output:
-      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".treefile",
+      outdir + "/analyses/finaltree/vfasttree/" + analysisname + ".treefile",
       concattree = outdir + "/" + analysisname + ".treefile",
-      complete_flag = outdir + "/analyses/finaltree/fasttree/" + analysisname + ".complete"
+      complete_flag = outdir + "/analyses/finaltree/vfasttree/" + analysisname + ".complete"
     shell:
       """
       declare -i genome_count
@@ -358,8 +360,8 @@ if config["tmethod"] == "fasttree":
         echo $error_message >> {workflow_log}
         exit 1
       fi
-      echo "fasttree {params.speciestree} {input.concataln} > {output[0]}" >> {log}
-      fasttree {params.speciestree} {input.concataln} > {output[0]} 
+      echo "VeryFastTree -threads {params.tree_cpus} {params.speciestree} {input.concataln} > {output[0]}" >> {log}
+      VeryFastTree -threads {params.tree_cpus} {params.speciestree} {input.concataln} > {output[0]} 
       cp {output[0]} {output.concattree}
       touch {output.complete_flag}
       """
@@ -404,7 +406,7 @@ elif config["tmethod"] == "iqtree":
       fi  
       touch {output.complete_flag}      
       """
-if config["tmethod"] == "fasttree":
+if config["tmethod"] == "vfasttree":
   rule cleanup:
     """
     intermediate files are kept including empty files, compress output 
@@ -412,9 +414,9 @@ if config["tmethod"] == "fasttree":
     conda:
       "envs/ete3.yml"
     input:
-      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".complete",
-      outdir + "/analyses/finaltree/fasttree/" + analysisname + ".treefile",
-      expand(outdir + "/analyses/proteintrees/fasttree/{model}.complete", model=MODELS)
+      outdir + "/analyses/finaltree/vfasttree/" + analysisname + ".complete",
+      outdir + "/analyses/finaltree/vfasttree/" + analysisname + ".treefile",
+      expand(outdir + "/analyses/proteintrees/vfasttree/{model}.complete", model=MODELS)
     params:
       fdir = outdir + "/analyses",
       itoldir = outdir + "/itol",

@@ -5,13 +5,12 @@ channels:
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=5.1=1_gnu
-  - fasttree=2.1.11=hec16e2b_1
   - hmmer=3.3.2=h87f3376_2
-  - iqtree=2.0.3=h176a8bc_1
+  - iqtree=2.3.3=h21ec9f0_0
   - libgcc-ng=11.2.0=h1234567_1
   - libgomp=11.2.0=h1234567_1
   - libstdcxx-ng=11.2.0=h1234567_1
   - mafft=7.310=h87f3376_5
   - trimal=1.4.1=h9f5acd7_6
+  - veryfasttree=4.0.03=h4ac6f70_0
   - zlib=1.2.13=h5eee18b_0
-prefix: /global/cfs/cdirs/nelli/frederik/conda/nsgt3
