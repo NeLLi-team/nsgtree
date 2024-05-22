@@ -261,7 +261,7 @@ if config["tmethod"] == "vfasttree":
     params:
       proteintrees = config["ft_proteintrees"],
       outdirt = outdir + "/analyses/proteintrees/vfasttree",
-      outpath = outdir + "/analyses/proteintrees/vfasttree/{model}"
+      outpath = outdir + "/analyses/proteintrees/vfasttree/{model}",
       tree_cpus = config["tree_cpus"]
     output:
       tree = outdir + "/proteintrees/{model}.treefile",
@@ -336,7 +336,7 @@ if config["tmethod"] == "vfasttree":
       outdir + "/analyses/log/trees/speciestree.log"
     params:
       speciestree = config["ft_speciestree"],
-      outpath = outdir + "/analyses/finaltree/vfasttree/" + analysisname
+      outpath = outdir + "/analyses/finaltree/vfasttree/" + analysisname,
       tree_cpus = config["tree_cpus"]
     input:
       concataln = outdir + "/" + analysisname + ".mafft_t"
@@ -368,7 +368,7 @@ if config["tmethod"] == "vfasttree":
 elif config["tmethod"] == "iqtree":
   rule species_tree:
     conda:
-      "envs/nsgtt.yml"
+    "envs/nsgtt.yml"
     log:
       outdir + "/analyses/log/trees/speciestree.log"
     params:
