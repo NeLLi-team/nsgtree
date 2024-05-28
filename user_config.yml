@@ -1,4 +1,4 @@
-tmethod: "vfasttree" # iqtree
+tmethod: "fasttree" # iqtree
 rfaadir: ""
 hmmsearch_cutoff: "-E 1e-5"  # e.g.  "-E 1e-10", "--cut_ga" or something else , for UNI56 use --cut_ga
 hmmsearch_cpu: "8"
