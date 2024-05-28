@@ -10,6 +10,7 @@ dependencies:
   - bzip2=1.0.8=h7b6447c_0
   - ca-certificates=2023.01.10=h06a4308_0
   - certifi=2022.12.7=py310h06a4308_0
+  - fasttree=2.1.11=h031d066_3
   - fftw=3.3.9=h27cfd23_1
   - intel-openmp=2021.4.0=h06a4308_3561
   - ld_impl_linux-64=2.38=h1181459_1
