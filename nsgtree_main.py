@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 NSGTree main entry point
-This replaces the Snakemake workflow with a simpler Python interface
+Modern CLI interface using Typer for better user experience
 """
 
-from nsgtree.main import main
+from nsgtree.cli import app
 
 if __name__ == "__main__":
-    main()
+    app()

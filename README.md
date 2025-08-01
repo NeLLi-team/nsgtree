@@ -1,17 +1,19 @@
 # NSGTree - New Simple Genome Tree
 
-_v0.5 March 2024_
+_v0.5 August 2025_
 
 NSGTree is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user-provided genomes and phylogenetic markers. It builds species trees based on concatenated alignments of proteins identified with HMM markers, and also constructs individual protein trees for each marker.
 
-This version uses **Pixi** for simplified installation and dependency management, making it much easier to use than previous versions.
+This version uses **Pixi** for simplified installation and dependency management, with a modern **Typer-based CLI** that makes it extremely easy to use for the scientific community.
 
 ## Why NSGTree?
 
 - **Fast**: 20-50% faster than SGTree depending on dataset size
-- **Simple**: Single command execution with automatic dependency management
+- **Simple**: Modern CLI with comprehensive help and examples
 - **Reliable**: Pure Python implementation with comprehensive error handling
+- **Safe**: Timestamped output directories prevent accidental overwrites
 - **Flexible**: Supports various tree-building methods (FastTree, IQ-TREE)
+- **User-Friendly**: Rich terminal interface with progress bars and beautiful output
 
 ## Installation
 
@@ -28,29 +30,79 @@ cd nsgtree
 pixi install
 ```
 
-That's it! All dependencies (MAFFT, trimAl, FastTree, IQ-TREE, HMMER, etc.) are automatically installed.
+That's it! All dependencies (MAFFT, trimAl, FastTree, IQ-TREE, HMMER, ete3, etc.) are automatically installed.
 
 ## Usage
 
-### Basic Usage
+### Getting Started
+
+NSGTree provides a comprehensive CLI with built-in help and examples:
+
 ```bash
-# Run with query genomes only
-pixi run nsgtree --qfaadir example --models resources/models/rnapol.hmm
+# Show available commands
+pixi run python nsgtree_main.py --help
 
-# Run with custom configuration
-pixi run nsgtree --qfaadir example --models resources/models/rnapol.hmm --config user_config.yml
+# Show example usage patterns
+pixi run python nsgtree_main.py examples
 
-# Run with query and reference genomes
-pixi run nsgtree --qfaadir example_q --rfaadir example_r --models resources/models/UNI56.hmm
+# List available HMM models
+pixi run python nsgtree_main.py models --list
+
+# Check your system and input files
+pixi run python nsgtree_main.py check example resources/models/rnapol.hmm
 ```
 
-### Command Line Options
-- `--qfaadir`: Directory containing query FAA files (required)
-- `--models`: Path to HMM models file (required)
-- `--rfaadir`: Directory containing reference FAA files (optional)
-- `--config`: User configuration file in YAML format (optional)
-- `--cores`: Number of CPU cores to use (default: 8)
-- `--verbose`: Enable verbose logging
+### Basic Analysis
+
+```bash
+# Run with query genomes only
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm
+
+# Run with query and reference genomes for comparative analysis
+pixi run python nsgtree_main.py run example_q resources/models/UNI56.hmm -r example_r
+
+# Use more CPU cores for faster processing
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -j 16
+```
+
+### Advanced Options
+
+```bash
+# Custom output directory (default: ./nsgt_out/ with timestamp)
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -o my_analysis
+
+# Use IQ-TREE instead of FastTree for more accurate trees
+pixi run python nsgtree_main.py run example resources/models/UNI56.hmm -t iqtree
+
+# Custom configuration file
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -c user_config.yml
+
+# Enable verbose logging to see detailed progress
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -v
+
+# Dry run to see what would be done without executing
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --dry-run
+```
+
+### Command Reference
+
+**Main Commands:**
+- `run`: Execute complete phylogenetic analysis
+- `models`: Manage and list HMM model files
+- `examples`: Show usage examples and scenarios
+- `check`: Validate input files and system requirements
+
+**Run Command Options:**
+- `qfaadir`: Directory containing query FAA files (required)
+- `models`: Path to HMM models file (required)
+- `-r, --rfaadir`: Directory containing reference FAA files (optional)
+- `-o, --output-name`: Custom output directory name (optional)
+- `-c, --config`: User configuration file in YAML format (optional)
+- `-j, --cores`: Number of CPU cores to use (default: 8)
+- `-t, --tree-method`: Tree building method: 'fasttree' or 'iqtree' (optional)
+- `-m, --min-marker`: Minimum fraction of markers required per genome (optional)
+- `-v, --verbose`: Enable verbose logging
+- `--dry-run`: Show what would be done without executing
 
 ### Example Datasets
 The repository includes example datasets:
@@ -87,17 +139,28 @@ iq_speciestree: "LG+F+R10"
 
 ## Output
 
-Results are saved to `<qfaadir>/nsgt_out/<analysis_name>/`:
+Results are saved to timestamped directories in `./nsgt_out/` (or custom directory with `-o`):
+
+```
+./nsgt_out/example--rnapol-fasttree-perc1_20250801_152613/
+```
+
+**Key Output Files:**
 - `<analysis_name>.treefile`: Final species tree (Newick format)
 - `<analysis_name>.mafft_t`: Concatenated alignment
 - `proteintrees/`: Individual protein trees for each marker
 - `itol/`: Tree visualization files for ITOL (Interactive Tree of Life)
   - `query_genomes.txt`: List of query genomes
   - `*_clades.itol`: ITOL annotation file for highlighting query clades
-  - `*_neighbors.pairs`: Nearest neighbor relationships (when available)
+  - `*_neighbors.pairs`: Nearest neighbor relationships (when references provided)
   - `*_analysis_summary.txt`: Summary of analysis and visualization files
 - `analyses.tar.gz`: Compressed intermediate results
 - `workflow.log`: Analysis log
+
+**Safety Features:**
+- **Timestamped directories**: Each run gets a unique directory with `YYYYMMDD_HHMMSS` timestamp
+- **No overwrites**: Multiple analyses never conflict or overwrite each other
+- **Organized output**: All results clearly separated by timestamp
 
 ## Performance Notes
 
@@ -117,10 +180,15 @@ Results are saved to `<qfaadir>/nsgt_out/<analysis_name>/`:
 
 ```bash
 cd nsgtree
-pixi run nsgtree --qfaadir example --models resources/models/rnapol.hmm
+
+# Show help and available commands
+pixi run python nsgtree_main.py --help
+
+# Run example analysis
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm
 ```
 
-This analyzes 12 example genomes using RNA polymerase markers and completes in about 5 minutes, producing a species tree in `example/nsgt_out/example--rnapol-fasttree-perc1/`.
+This analyzes 12 example genomes using RNA polymerase markers and completes in about 5 minutes, producing a species tree in `./nsgt_out/example--rnapol-fasttree-perc1_YYYYMMDD_HHMMSS/`.
 
 ## Tree Visualization
 
@@ -138,14 +206,35 @@ The visualization files help you:
 
 ## What's New in the Pixi Version
 
-- **Simplified Installation**: No conda environment management needed
-- **Single Command**: Replace complex Snakemake commands with simple CLI
-- **Better Error Handling**: Clear error messages and logging
-- **Faster Setup**: All dependencies automatically managed
-- **Cross-platform**: Works on Linux, macOS, and Windows (with WSL)
-- **Tree Visualization**: Automatic generation of ITOL annotation files for phylogenetic visualization
-- **Clade Analysis**: Identification and highlighting of monophyletic query clades
-- **Nearest Neighbor Analysis**: Find closest phylogenetic relatives for query genomes
+### Modern CLI Interface
+- **Comprehensive Help System**: Built-in examples, model management, and system checking
+- **Rich Terminal Interface**: Beautiful progress bars, tables, and colored output
+- **Interactive Confirmations**: Safe execution with confirmation prompts
+- **Command Validation**: Built-in checks for input files and system requirements
+
+### Enhanced Safety & Usability
+- **Timestamped Output Directories**: Each analysis gets a unique directory (no more overwrites!)
+- **Current Directory Output**: Results saved to `./nsgt_out/` by default (much more intuitive)
+- **Custom Output Names**: Use `-o` to specify custom output directory names
+- **Dry Run Mode**: See what will be done before executing with `--dry-run`
+
+### Improved Phylogenetic Analysis
+- **Enhanced ete3 Integration**: Full tree visualization and analysis capabilities
+- **Working Nearest Neighbor Analysis**: Find closest relatives for query genomes
+- **Comprehensive Tree Analysis**: Automatic clade detection and ITOL annotation generation
+- **Robust Error Handling**: Better error messages and recovery from failures
+
+### Technical Improvements
+- **Simplified Installation**: Single `pixi install` command handles all dependencies
+- **Cross-Platform Support**: Works on Linux, macOS, and Windows (with WSL)
+- **Better Dependency Management**: Automatic handling of bioinformatics tools
+- **Performance Optimizations**: Faster execution and better resource usage
+
+### For Scientists
+- **Example-Driven Documentation**: Learn by example with built-in usage patterns
+- **Model Management**: Easy listing and selection of HMM models
+- **System Validation**: Check your setup before running analyses
+- **Visualization Ready**: Automatic generation of publication-ready tree files
 
 ## Acknowledgements
 

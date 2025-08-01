@@ -13,6 +13,7 @@ import subprocess
 import shutil
 from pathlib import Path
 import tempfile
+from datetime import datetime
 
 from .scripts import reformat
 from .scripts import hmmsearch_count_filter
@@ -75,7 +76,7 @@ class NSGTreeWorkflow:
 
         return config
 
-    def run_workflow(self, qfaadir, models, rfaadir=None):
+    def run_workflow(self, qfaadir, models, rfaadir=None, output_dir=None):
         """Run the complete NSGTree workflow"""
         try:
             # Initialize paths and variables
@@ -91,15 +92,20 @@ class NSGTreeWorkflow:
             modelscombined = Path(models)
             models_base = modelscombined.stem
 
-            # Create analysis name
+            # Create analysis name with timestamp for safety
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             analysisname = str(qfaadir_base +
                 "-" + rfaadir_base +
                 "-" + models_base +
                 "-" + self.config["tmethod"] +
-                "-perc" + str(int(float(self.config["minmarker"])*10))).replace(".", "")
+                "-perc" + str(int(float(self.config["minmarker"])*10)) +
+                "_" + timestamp).replace(".", "")
 
-            # Set up output directory
-            outdir = qfaadir / "nsgt_out" / analysisname
+            # Set up output directory - default to current working directory
+            if output_dir:
+                outdir = Path(output_dir) / analysisname
+            else:
+                outdir = Path.cwd() / "nsgt_out" / analysisname
             outdir.mkdir(parents=True, exist_ok=True)
 
             # Set up workflow log

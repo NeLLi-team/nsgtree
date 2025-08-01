@@ -20,68 +20,126 @@ def main(args=None):
         """
         get all leaves under a parental node
         """
-        children = node.get_children()
+        if node is None or node.up is None:
+            return leaves
+
+        parent = node.up
+        children = parent.get_children()
         for child in children:
-            childname = str(child).replace("--","").replace("/-", "").replace("\-", "").replace("\n","")
-            if child.is_leaf() and childname not in queries:
+            if child.is_leaf():
+                childname = str(child.name).replace("--","").replace("/-", "").replace("\\-", "").replace("\\n","")
+                if childname not in queries and childname not in seen:
                     seen.append(childname)
                     leaves.append(childname)
-            elif not child.is_leaf() and childname not in seen:
-                seen.append(childname)
-                unpack_family(child, leaves, query, seen, queries)
-            elif child.is_leaf() and childname == query:
-                seen.append(childname)
-            else:
-                pass
-        if len(leaves)==0:
-            parentnode = node.up
-            unpack_family(parentnode, leaves, query, seen, queries)
+                elif childname == query:
+                    seen.append(childname)
+            elif not child.is_leaf() and str(child) not in seen:
+                seen.append(str(child))
+                # Recursively get leaves from subtree
+                for leaf in child.get_leaves():
+                    leafname = str(leaf.name).replace("--","").replace("/-", "").replace("\\-", "").replace("\\n","")
+                    if leafname not in queries and leafname not in leaves:
+                        leaves.append(leafname)
+
+        # If still no leaves found, go up one more level
+        if len(leaves) == 0 and parent.up is not None:
+            return unpack_family(parent, leaves, query, seen, queries)
         return leaves
 
 
     def get_closestrelative(query, leaves, node, tree):
-        distance = 10
+        distance = float('inf')
         closestrelative = "nd"
-        for child in leaves:
-            if child != query:
-                newdist = t.get_distance(child, query, topology_only = False)
-                if newdist < distance:
-                    distance = newdist
-                    closestrelative = child
-                else:
-                    pass
-        return closestrelative, distance
+        query_node = None
+
+        # Find the query node in the tree
+        for n in tree.traverse():
+            if n.name == query:
+                query_node = n
+                break
+
+        if query_node is None:
+            return closestrelative, distance
+
+        for leaf_name in leaves:
+            if leaf_name != query:
+                # Find the leaf node
+                leaf_node = None
+                for n in tree.traverse():
+                    if n.name == leaf_name:
+                        leaf_node = n
+                        break
+
+                if leaf_node is not None:
+                    try:
+                        newdist = tree.get_distance(leaf_node, query_node, topology_only=False)
+                        if newdist < distance:
+                            distance = newdist
+                            closestrelative = leaf_name
+                    except:
+                        # If distance calculation fails, try topology-only
+                        try:
+                            newdist = tree.get_distance(leaf_node, query_node, topology_only=True)
+                            if newdist < distance:
+                                distance = newdist
+                                closestrelative = leaf_name
+                        except:
+                            continue
+
+        return closestrelative, distance if distance != float('inf') else 0
 
 
-    def get_neighbor(t, query, queries):
-        for node in t.traverse():
+    def get_neighbor(tree, query, queries):
+        query_node = None
+        for node in tree.traverse():
             if node.name == query:
-                child = str(node.name).replace("--","").replace("/-", "").replace("\-", "").replace("\n","")
-                queryintree = node.name
-                # move up one node in the tree
-                # collect all terminal leaves under the parent node
-                leaves = []
-                seen = []
-                leaves = unpack_family(node, leaves, query, seen, queries)
-                closestrelative, distance = get_closestrelative(queryintree, leaves, node, t)
-                return [closestrelative, distance]
+                query_node = node
+                break
 
-    # get queries
-    with open(queries_in) as infile:
-        queries = infile.read().splitlines()
+        if query_node is None:
+            return ["nd", "nd"]
 
-    # all distances
-    tree_dict_all = {}
-    t = Tree(tree_in)
-    for query in queries:
-        tree_dict_all[query] =  get_neighbor(t, query, queries)
-    df = pd.DataFrame.from_dict(tree_dict_all).fillna("nd").T
-    with open(outname + ".pairs", "w") as outfile:
-        for query, bestref in tree_dict_all.items():
-            if bestref:
-                outfile.write(f"{query}\t{bestref[0]}\t{bestref[1]}\n")
-            else:
-                outfile.write(f"{query}\tnd\tnd\n")
+        # collect all terminal leaves under the parent node
+        leaves = []
+        seen = []
+        leaves = unpack_family(query_node, leaves, query, seen, queries)
+
+        if not leaves:
+            # If no leaves found, get all leaves from the tree except queries
+            for leaf in tree.get_leaves():
+                if leaf.name not in queries:
+                    leaves.append(leaf.name)
+
+        closestrelative, distance = get_closestrelative(query, leaves, query_node, tree)
+        return [closestrelative, distance]
+
+    try:
+        # get queries
+        with open(queries_in) as infile:
+            queries = infile.read().splitlines()
+
+        # all distances
+        tree_dict_all = {}
+        tree = Tree(tree_in)
+
+        for query in queries:
+            tree_dict_all[query] = get_neighbor(tree, query, queries)
+
+        # Write results
+        with open(outname + ".pairs", "w") as outfile:
+            outfile.write("Query\tClosest_Relative\tDistance\n")  # Header
+            for query, bestref in tree_dict_all.items():
+                if bestref and bestref[0] != "nd":
+                    outfile.write(f"{query}\t{bestref[0]}\t{bestref[1]}\n")
+                else:
+                    outfile.write(f"{query}\tnd\tnd\n")
+
+    except Exception as e:
+        print(f"Error in nearest neighbor analysis: {e}")
+        # Create empty file so workflow continues
+        with open(outname + ".pairs", "w") as outfile:
+            outfile.write("Query\tClosest_Relative\tDistance\n")
+            outfile.write("# Analysis failed - check tree file and query names\n")
 
 
 if __name__ == "__main__":
