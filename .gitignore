@@ -1,8 +1,9 @@
-.snakemake/
-examplegv/
-user_config_dev.yml
-example/nsgt_out
+# Output directories
+example/nsgt_out/
 analyses/
+
+# Development files
+user_config_dev.yml
 
 # Python build artifacts
 __pycache__/
@@ -11,3 +12,7 @@ build/
 dist/
 *.pyc
 *.pyo
+
+# Legacy files (no longer needed)
+.snakemake/
+examplegv/
