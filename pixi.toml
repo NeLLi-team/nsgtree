@@ -20,6 +20,7 @@ fasttree = ">=2.1"
 iqtree = ">=2.0"
 veryfasttree = ">=4.0"
 pyyaml = ">=6.0"
+ete3 = ">=3.1"
 
 [tasks]
 install = "pip install -e ."

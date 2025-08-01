@@ -19,6 +19,8 @@ from .scripts import hmmsearch_count_filter
 from .scripts import extract_qhits
 from .scripts import concat
 from .scripts import cleanup
+from .scripts import ete3_clademembers
+from .scripts import ete3_nntree
 
 
 class NSGTreeWorkflow:
@@ -150,8 +152,12 @@ class NSGTreeWorkflow:
             self.logger.info("Step 10: Building species tree")
             self._build_species_tree(concat_aln, outdir, analysisname)
 
-            # Step 11: Cleanup and compress
-            self.logger.info("Step 11: Cleaning up and compressing results")
+            # Step 11: Generate tree visualizations and analysis
+            self.logger.info("Step 11: Generating tree visualizations and analysis")
+            self._generate_tree_analysis(outdir, analysisname, qfaadir, rfaadir)
+
+            # Step 12: Cleanup and compress
+            self.logger.info("Step 12: Cleaning up and compressing results")
             self._cleanup_and_compress(outdir, analysisname)
 
             self.logger.info("NSGTree workflow completed successfully!")
@@ -552,6 +558,75 @@ class NSGTreeWorkflow:
             concat_tree.touch()
 
         complete_flag.touch()
+
+    def _generate_tree_analysis(self, outdir, analysisname, qfaadir, rfaadir):
+        """Generate tree visualizations and analysis using ete3"""
+        species_tree = outdir / f"{analysisname}.treefile"
+        itol_dir = outdir / "itol"
+        itol_dir.mkdir(exist_ok=True)
+
+        # Only proceed if we have a valid tree file
+        if not species_tree.exists() or species_tree.stat().st_size == 0:
+            self.logger.warning("No valid species tree found, skipping visualization")
+            return
+
+        try:
+            # Generate query genome list
+            query_genomes = []
+            for faa_file in qfaadir.glob("*.faa"):
+                genome_name = faa_file.stem
+                query_genomes.append(genome_name)
+
+            # Create query list file
+            query_list_file = itol_dir / "query_genomes.txt"
+            with open(query_list_file, 'w') as f:
+                for genome in query_genomes:
+                    f.write(f"{genome}\n")
+
+            # Generate clade analysis for ITOL visualization
+            self.logger.info("Generating clade analysis for ITOL")
+            clade_output = itol_dir / f"{analysisname}_clades.itol"
+
+            # Run ete3_clademembers
+            ete3_clademembers.main([
+                str(species_tree),
+                str(query_list_file),
+                "FF0000",  # Red color for query clades
+                str(clade_output)
+            ])
+
+            # Generate nearest neighbor analysis
+            self.logger.info("Generating nearest neighbor analysis")
+            nn_output = itol_dir / f"{analysisname}_neighbors"
+
+            # Run ete3_nntree
+            ete3_nntree.main([
+                str(species_tree),
+                str(query_list_file),
+                str(nn_output)
+            ])
+
+            # Create summary file
+            summary_file = itol_dir / f"{analysisname}_analysis_summary.txt"
+            with open(summary_file, 'w') as f:
+                f.write("NSGTree Analysis Summary\n")
+                f.write("========================\n\n")
+                f.write(f"Analysis name: {analysisname}\n")
+                f.write(f"Query genomes: {len(query_genomes)}\n")
+                f.write(f"Species tree: {species_tree.name}\n\n")
+                f.write("Generated files:\n")
+                f.write(f"- ITOL clade annotations: {clade_output.name}\n")
+                f.write(f"- Nearest neighbor analysis: {nn_output.name}.pairs\n")
+                f.write(f"- Query genome list: {query_list_file.name}\n\n")
+                f.write("Instructions:\n")
+                f.write("1. Upload your tree file to https://itol.embl.de/\n")
+                f.write("2. Use the ITOL annotation files to highlight query clades\n")
+                f.write("3. Check the nearest neighbor file for phylogenetic relationships\n")
+
+            self.logger.info(f"Tree analysis completed. Results in: {itol_dir}")
+
+        except Exception as e:
+            self.logger.warning(f"Tree analysis failed: {str(e)}. Core functionality unaffected.")
 
     def _cleanup_and_compress(self, outdir, analysisname):
         """Clean up and compress results"""

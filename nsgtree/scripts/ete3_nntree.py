@@ -7,10 +7,14 @@ import pandas as pd
 import warnings
 warnings.filterwarnings("ignore", ".*is with a literal.*", SyntaxWarning)
 
-def main():
-    tree_in = sys.argv[1]
-    queries_in = sys.argv[2]
-    outname = sys.argv[3]
+def main(args=None):
+    """Main function that can be called with arguments or use sys.argv"""
+    if args is None:
+        args = sys.argv[1:]
+
+    tree_in = args[0]
+    queries_in = args[1]
+    outname = args[2]
 
     def unpack_family(node, leaves, query, seen, queries):
         """

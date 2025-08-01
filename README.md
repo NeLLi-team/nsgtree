@@ -91,6 +91,11 @@ Results are saved to `<qfaadir>/nsgt_out/<analysis_name>/`:
 - `<analysis_name>.treefile`: Final species tree (Newick format)
 - `<analysis_name>.mafft_t`: Concatenated alignment
 - `proteintrees/`: Individual protein trees for each marker
+- `itol/`: Tree visualization files for ITOL (Interactive Tree of Life)
+  - `query_genomes.txt`: List of query genomes
+  - `*_clades.itol`: ITOL annotation file for highlighting query clades
+  - `*_neighbors.pairs`: Nearest neighbor relationships (when available)
+  - `*_analysis_summary.txt`: Summary of analysis and visualization files
 - `analyses.tar.gz`: Compressed intermediate results
 - `workflow.log`: Analysis log
 
@@ -117,6 +122,20 @@ pixi run nsgtree --qfaadir example --models resources/models/rnapol.hmm
 
 This analyzes 12 example genomes using RNA polymerase markers and completes in about 5 minutes, producing a species tree in `example/nsgt_out/example--rnapol-fasttree-perc1/`.
 
+## Tree Visualization
+
+NSGTree automatically generates visualization files for use with ITOL (Interactive Tree of Life):
+
+1. **Upload your tree**: Go to https://itol.embl.de/ and upload your `.treefile`
+2. **Add annotations**: Use the generated `.itol` files to highlight query clades in different colors
+3. **Analyze relationships**: Check the `.pairs` files for nearest neighbor relationships
+4. **Customize visualization**: Use ITOL's web interface for additional styling and analysis
+
+The visualization files help you:
+- **Identify monophyletic groups**: See which query genomes cluster together
+- **Highlight query taxa**: Distinguish your genomes from references in the tree
+- **Find closest relatives**: Understand phylogenetic relationships between queries and references
+
 ## What's New in the Pixi Version
 
 - **Simplified Installation**: No conda environment management needed
@@ -124,6 +143,9 @@ This analyzes 12 example genomes using RNA polymerase markers and completes in a
 - **Better Error Handling**: Clear error messages and logging
 - **Faster Setup**: All dependencies automatically managed
 - **Cross-platform**: Works on Linux, macOS, and Windows (with WSL)
+- **Tree Visualization**: Automatic generation of ITOL annotation files for phylogenetic visualization
+- **Clade Analysis**: Identification and highlighting of monophyletic query clades
+- **Nearest Neighbor Analysis**: Find closest phylogenetic relatives for query genomes
 
 ## Acknowledgements
 

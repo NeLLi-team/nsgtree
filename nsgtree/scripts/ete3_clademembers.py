@@ -5,10 +5,6 @@ import os.path
 import warnings
 warnings.filterwarnings("ignore", ".*is with a literal.*", SyntaxWarning)
 
-treein = sys.argv[1] # tree in newick format
-queryids_or_pattern = sys.argv[2] # file with leaf names or pattern to look for leaves
-hexcolor =  sys.argv[3] # color for identified branches
-itolout = sys.argv[4] # name of outfile
 
 def get_alltaxa(t, queryids_or_pattern):
     target = []
@@ -31,7 +27,7 @@ def unpack_family(parentnode, leaves, target):
         if child.is_leaf() and child.name not in leaves:
             leaves.append(child.name)
         else:
-            unpack_family(child, leaves, target) 
+            unpack_family(child, leaves, target)
     return leaves
 
 
@@ -45,7 +41,16 @@ def check_monophyly(node, target, mono_leaves):
         check_monophyly(parentnode, target, mono_leaves)
     return mono_leaves
 
-def main():
+def main(args=None):
+    """Main function that can be called with arguments or use sys.argv"""
+    if args is None:
+        args = sys.argv[1:]
+
+    treein = args[0]  # tree in newick format
+    queryids_or_pattern = args[1]  # file with leaf names or pattern to look for leaves
+    hexcolor = args[2]  # color for identified branches
+    itolout = args[3]  # name of outfile
+
     t = Tree(treein)
     target = get_alltaxa(t, queryids_or_pattern)
     mono_leaves_all = []
