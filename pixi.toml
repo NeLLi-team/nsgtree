@@ -1,0 +1,30 @@
+[project]
+name = "nsgtree"
+version = "0.5.0"
+description = "New SGTree: Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs"
+authors = ["fschulz@lbl.gov"]
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+license = "MIT"
+
+[dependencies]
+python = ">=3.10,<3.12"
+biopython = ">=1.78"
+pandas = ">=1.5"
+numpy = ">=1.23"
+scipy = ">=1.9"
+hmmer = ">=3.3"
+mafft = ">=7.3"
+trimal = ">=1.4"
+fasttree = ">=2.1"
+iqtree = ">=2.0"
+veryfasttree = ">=4.0"
+pyyaml = ">=6.0"
+
+[tasks]
+install = "pip install -e ."
+nsgtree = "python nsgtree_main.py"
+help = "python nsgtree_main.py --help"
+
+[pypi-dependencies]
+nsgtree = { path = ".", editable = true }
