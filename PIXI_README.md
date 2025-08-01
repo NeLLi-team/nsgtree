@@ -32,7 +32,7 @@ pixi run nsgtree --qfaadir example_q --rfaadir example_r --models resources/mode
 
 ### Command Line Options
 - `--qfaadir`: Directory containing query FAA files (required)
-- `--models`: Path to HMM models file (required)  
+- `--models`: Path to HMM models file (required)
 - `--rfaadir`: Directory containing reference FAA files (optional)
 - `--config`: User configuration file in YAML format (optional)
 - `--cores`: Number of CPU cores to use (default: 8)

@@ -519,7 +519,7 @@ class NSGTreeWorkflow:
 
                 f.write(" ".join(cmd) + "\n")
                 self.logger.info(f"Running FastTree: {' '.join(cmd)}")
-                
+
                 with open(species_tree, 'w') as tree_out:
                     result = subprocess.run(cmd, stdout=tree_out, stderr=f, timeout=1800)
                     if result.returncode != 0:

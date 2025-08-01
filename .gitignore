@@ -1,3 +1,13 @@
 .snakemake/
 examplegv/
 user_config_dev.yml
+example/nsgt_out
+analyses/
+
+# Python build artifacts
+__pycache__/
+*.egg-info/
+build/
+dist/
+*.pyc
+*.pyo
