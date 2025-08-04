@@ -1,6 +1,6 @@
 # NSGTree - New Simple Genome Tree
 
-_v0.5 August 2025_
+_v0.5.1 August 2025_
 
 NSGTree is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user-provided genomes and phylogenetic markers. It builds species trees based on concatenated alignments of proteins identified with HMM markers, and also constructs individual protein trees for each marker.
 
@@ -14,6 +14,7 @@ This version uses **Pixi** for simplified installation and dependency management
 - **Safe**: Timestamped output directories prevent accidental overwrites
 - **Flexible**: Supports various tree-building methods (FastTree, IQ-TREE)
 - **User-Friendly**: Rich terminal interface with progress bars and beautiful output
+- **HPC-Ready**: Runs automatically without prompts by default, with optional interactive mode
 
 ## Installation
 
@@ -82,6 +83,9 @@ pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -v
 
 # Dry run to see what would be done without executing
 pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --dry-run
+
+# Interactive mode with confirmation prompts (useful for manual analysis)
+pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --interactive
 ```
 
 ### Command Reference
@@ -101,6 +105,7 @@ pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --dry-ru
 - `-j, --cores`: Number of CPU cores to use (default: 8)
 - `-t, --tree-method`: Tree building method: 'fasttree' or 'iqtree' (optional)
 - `-m, --min-marker`: Minimum fraction of markers required per genome (optional)
+- `-i, --interactive`: Enable interactive mode with confirmation prompts (optional)
 - `-v, --verbose`: Enable verbose logging
 - `--dry-run`: Show what would be done without executing
 

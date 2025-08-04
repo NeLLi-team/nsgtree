@@ -669,6 +669,7 @@ def main():
 Example usage:
   nsgtree --qfaadir example --models resources/models/rnapol.hmm
   nsgtree --qfaadir example_q --rfaadir example_r --models resources/models/UNI56.hmm --config user_config.yml
+  nsgtree --qfaadir example --models resources/models/rnapol.hmm --interactive  # Enable confirmation prompts
         """
     )
 
@@ -684,11 +685,29 @@ Example usage:
                        help='Number of CPU cores to use (default: 8)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
+    parser.add_argument('--interactive', '-i', action='store_true',
+                       help='Enable interactive mode with confirmation prompts (default: False, runs automatically)')
 
     args = parser.parse_args()
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Handle interactive mode
+    if args.interactive:
+        print("\nNSGTree Analysis Configuration:")
+        print(f"  Query directory: {args.qfaadir}")
+        print(f"  Models file: {args.models}")
+        if args.rfaadir:
+            print(f"  Reference directory: {args.rfaadir}")
+        print(f"  CPU cores: {args.cores}")
+        if args.config:
+            print(f"  Config file: {args.config}")
+
+        response = input("\nProceed with analysis? [y/N]: ").lower()
+        if response != 'y' and response != 'yes':
+            print("Analysis cancelled.")
+            sys.exit(0)
 
     # Update config with command line arguments
     workflow = NSGTreeWorkflow(user_config_file=args.config)

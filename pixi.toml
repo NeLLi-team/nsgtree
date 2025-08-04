@@ -1,6 +1,6 @@
 [project]
 name = "nsgtree"
-version = "0.5.0"
+version = "0.5.1"
 description = "New SGTree: Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs"
 authors = ["Frederik Schulz <fschulz@lbl.gov>", "Juan C. Villada <jvillada@lbl.gov>"]
 channels = ["conda-forge", "bioconda"]

@@ -23,7 +23,7 @@ console = Console()
 def version_callback(value: bool):
     """Handle version display"""
     if value:
-        console.print("NSGTree version 0.5.0")
+        console.print("NSGTree version 0.5.1")
         console.print("DOE Joint Genome Institute")
         raise typer.Exit()
 
@@ -50,7 +50,7 @@ def print_banner():
     banner = """
 [bold blue]🧬 NSGTree - New Simple Genome Tree[/bold blue]
 [dim]Fast phylogenetic analysis from concatenated protein alignments[/dim]
-[dim]Version 0.5.0 | DOE Joint Genome Institute[/dim]
+[dim]Version 0.5.1 | DOE Joint Genome Institute[/dim]
     """
     console.print(Panel(banner, style="blue"))
 
@@ -110,7 +110,8 @@ def run(
                                              help="Minimum fraction of markers required per genome", min=0.0, max=1.0),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without executing"),
-    output_name: Optional[str] = typer.Option(None, "--output-name", "-o", help="Custom output directory name")
+    output_name: Optional[str] = typer.Option(None, "--output-name", "-o", help="Custom output directory name"),
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Enable interactive mode with confirmation prompts")
 ):
     """
     🚀 Run complete NSGTree phylogenetic analysis
@@ -126,6 +127,9 @@ def run(
     8. Generate visualization files
     9. Clean up and compress results
 
+    By default, the analysis runs automatically without confirmation prompts,
+    making it suitable for HPC environments and batch processing.
+
     Example usage:
 
     [bold cyan]Basic analysis:[/bold cyan]
@@ -133,6 +137,9 @@ def run(
 
     [bold cyan]With reference genomes:[/bold cyan]
     nsgtree run example_q resources/models/UNI56.hmm -r example_r
+
+    [bold cyan]Interactive mode with confirmation:[/bold cyan]
+    nsgtree run example resources/models/rnapol.hmm --interactive
 
     [bold cyan]Custom parameters:[/bold cyan]
     nsgtree run example resources/models/rnapol.hmm -c config.yml -j 16 -v
@@ -179,10 +186,13 @@ def run(
         console.print("\n[yellow]Dry run completed. Use --verbose to see more details.[/yellow]")
         return
 
-    # Confirm before running
-    if not typer.confirm("\nProceed with analysis?"):
-        console.print("Analysis cancelled.")
-        raise typer.Exit(0)
+    # Confirm before running (only in interactive mode)
+    if interactive:
+        if not typer.confirm("\nProceed with analysis?"):
+            console.print("Analysis cancelled.")
+            raise typer.Exit(0)
+    else:
+        console.print("\n[green]Starting analysis...[/green]")
 
     # Set up workflow
     try:
@@ -407,7 +417,7 @@ def main(
     Build species trees from concatenated alignments with automatic visualization.
     """
     if version:
-        console.print("NSGTree version 0.5.0")
+        console.print("NSGTree version 0.5.1")
         console.print("DOE Joint Genome Institute")
         raise typer.Exit()
 
