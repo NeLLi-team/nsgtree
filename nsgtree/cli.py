@@ -338,7 +338,7 @@ def check(
     console.print("[bold green]Checking dependencies...[/bold green]")
     dependencies = [
         ("Python", "python"),
-        ("BioPython", "biopython"),
+        ("BioPython", "Bio"),
         ("HMMER", "hmmsearch"),
         ("MAFFT", "mafft"),
         ("trimAl", "trimal"),
