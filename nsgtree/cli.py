@@ -111,7 +111,8 @@ def run(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without executing"),
     output_name: Optional[str] = typer.Option(None, "--output-name", "-o", help="Custom output directory name"),
-    interactive: bool = typer.Option(False, "--interactive", "-i", help="Enable interactive mode with confirmation prompts")
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Enable interactive mode with confirmation prompts"),
+    force_new: bool = typer.Option(False, "--force-new", help="Force a new analysis instead of resuming existing incomplete analysis")
 ):
     """
     🚀 Run complete NSGTree phylogenetic analysis
@@ -224,7 +225,8 @@ def run(
                 qfaadir=str(qfaa_path),
                 models=str(models_path),
                 rfaadir=str(rfaa_path) if rfaa_path else None,
-                output_dir=output_name
+                output_dir=output_name,
+                force_new=force_new
             )
 
             progress.update(task, completed=True, description="Analysis completed!")
@@ -351,7 +353,7 @@ def check(
                 console.print(f"  ✅ {name}: Python {sys.version.split()[0]}")
             elif module in ["hmmsearch", "mafft", "trimal", "fasttree", "iqtree"]:
                 import subprocess
-                result = subprocess.run([module, "--help"], capture_output=True, text=True, timeout=5)
+                result = subprocess.run([module, "--help"], capture_output=True, text=True)
                 console.print(f"  ✅ {name}: Available")
             else:
                 __import__(module)

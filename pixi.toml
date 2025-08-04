@@ -7,6 +7,9 @@ channels = ["conda-forge", "bioconda"]
 platforms = ["linux-64", "osx-64", "osx-arm64"]
 license = "MIT"
 
+# Note: NSGTree uses /usr/bin/time for resource monitoring (typically available on Linux systems)
+# If not available, resource monitoring will be disabled but core functionality remains unaffected
+
 [dependencies]
 python = ">=3.10,<3.12"
 biopython = ">=1.78"

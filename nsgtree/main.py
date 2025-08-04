@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 import tempfile
 from datetime import datetime
+import json
 
 from .scripts import reformat
 from .scripts import hmmsearch_count_filter
@@ -24,11 +25,176 @@ from .scripts import ete3_clademembers
 from .scripts import ete3_nntree
 
 
+class ResourceMonitor:
+    """Monitor CPU, memory, and wall-clock time using /usr/bin/time"""
+
+    def __init__(self, output_dir):
+        self.output_dir = Path(output_dir)
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.resource_log = self.output_dir / f"resource_usage_{self.timestamp}.log"
+        self.total_resources = {
+            'wall_time_seconds': 0.0,
+            'cpu_time_seconds': 0.0,
+            'max_memory_gb': 0.0,
+            'commands_executed': 0
+        }
+
+        # Check if /usr/bin/time is available
+        self.time_available = self._check_time_availability()
+
+        # Initialize log file
+        self._initialize_log()
+
+    def _check_time_availability(self):
+        """Check if /usr/bin/time is available"""
+        try:
+            result = subprocess.run(["/usr/bin/time", "--version"],
+                                  capture_output=True, text=True)
+            return result.returncode == 0
+        except (FileNotFoundError, PermissionError):
+            return False
+
+    def _initialize_log(self):
+        """Initialize the resource usage log file"""
+        with open(self.resource_log, 'w') as f:
+            f.write("=" * 80 + "\n")
+            f.write(f"NSGTree Resource Usage Log - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 80 + "\n")
+            f.write(f"Time monitoring available: {self.time_available}\n")
+            f.write("Format: Command | Wall Time (s) | CPU Time (s) | Max Memory (GB) | CPU %\n")
+            f.write("-" * 80 + "\n")
+
+    def run_with_monitoring(self, cmd, description="Command", **kwargs):
+        """Run a command with resource monitoring"""
+        if not self.time_available:
+            # Fallback to regular subprocess if /usr/bin/time is not available
+            result = subprocess.run(cmd, **kwargs)
+            self._log_command_fallback(cmd, description)
+            return result
+
+        # Create temporary file for time output
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.time', delete=False) as tmp:
+            time_output_file = tmp.name
+
+        try:
+            # Prepare time command with custom format
+            time_format = "%C\\n%e\\n%U\\n%S\\n%M\\n%P"
+            time_cmd = [
+                "/usr/bin/time",
+                "-f", time_format,
+                "-o", time_output_file
+            ] + cmd
+
+            # Run the command
+            result = subprocess.run(time_cmd, **kwargs)
+
+            # Parse the time output
+            self._parse_and_log_time_output(time_output_file, cmd, description)
+
+            return result
+
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(time_output_file)
+            except OSError:
+                pass
+
+    def _parse_and_log_time_output(self, time_output_file, cmd, description):
+        """Parse /usr/bin/time output and log it"""
+        try:
+            with open(time_output_file, 'r') as f:
+                lines = [line.strip() for line in f.readlines()]
+
+            if len(lines) >= 6:
+                command_str = lines[0]
+                wall_time = float(lines[1])
+                user_time = float(lines[2])
+                sys_time = float(lines[3])
+                max_memory_kb = int(lines[4])
+                cpu_percent = lines[5].rstrip('%')
+
+                cpu_time = user_time + sys_time
+                max_memory_gb = max_memory_kb / (1024 * 1024)  # Convert KB to GB
+
+                # Update totals
+                self.total_resources['wall_time_seconds'] += wall_time
+                self.total_resources['cpu_time_seconds'] += cpu_time
+                self.total_resources['max_memory_gb'] = max(
+                    self.total_resources['max_memory_gb'], max_memory_gb
+                )
+                self.total_resources['commands_executed'] += 1
+
+                # Log to file
+                with open(self.resource_log, 'a') as f:
+                    f.write(f"{description}: {' '.join(cmd)}\n")
+                    f.write(f"  Wall Time: {wall_time:.2f}s | CPU Time: {cpu_time:.2f}s | ")
+                    f.write(f"Max Memory: {max_memory_gb:.3f} GB | CPU: {cpu_percent}%\n")
+                    f.write("-" * 80 + "\n")
+
+        except (ValueError, IndexError, FileNotFoundError) as e:
+            self._log_command_fallback(cmd, description, error=str(e))
+
+    def _log_command_fallback(self, cmd, description, error=None):
+        """Log command without resource monitoring"""
+        with open(self.resource_log, 'a') as f:
+            f.write(f"{description}: {' '.join(cmd)}\n")
+            if error:
+                f.write(f"  Resource monitoring failed: {error}\n")
+            else:
+                f.write("  Resource monitoring not available\n")
+            f.write("-" * 80 + "\n")
+
+        self.total_resources['commands_executed'] += 1
+
+    def generate_final_report(self):
+        """Generate final resource usage report"""
+        report = {
+            'timestamp': self.timestamp,
+            'total_wall_time_seconds': self.total_resources['wall_time_seconds'],
+            'total_wall_time_formatted': self._format_time(self.total_resources['wall_time_seconds']),
+            'total_cpu_time_seconds': self.total_resources['cpu_time_seconds'],
+            'total_cpu_time_formatted': self._format_time(self.total_resources['cpu_time_seconds']),
+            'max_memory_gb': self.total_resources['max_memory_gb'],
+            'commands_executed': self.total_resources['commands_executed'],
+            'monitoring_available': self.time_available
+        }
+
+        # Write summary to log
+        with open(self.resource_log, 'a') as f:
+            f.write("\n" + "=" * 80 + "\n")
+            f.write("FINAL RESOURCE USAGE SUMMARY\n")
+            f.write("=" * 80 + "\n")
+            f.write(f"Total Wall Time: {report['total_wall_time_formatted']}\n")
+            f.write(f"Total CPU Time: {report['total_cpu_time_formatted']}\n")
+            f.write(f"Peak Memory Usage: {report['max_memory_gb']:.3f} GB\n")
+            f.write(f"Commands Executed: {report['commands_executed']}\n")
+            f.write(f"Resource Log: {self.resource_log}\n")
+            f.write("=" * 80 + "\n")
+
+        return report
+
+    def _format_time(self, seconds):
+        """Format seconds into human-readable time"""
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            secs = seconds % 60
+            return f"{minutes}m {secs:.1f}s"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = seconds % 60
+            return f"{hours}h {minutes}m {secs:.1f}s"
+
+
 class NSGTreeWorkflow:
     def __init__(self, config_file="config.yml", user_config_file=None):
         self.logger = self._setup_logging()
         self.config = self._load_config(config_file, user_config_file)
         self.workflow_log = None
+        self.resource_monitor = None
 
     def _setup_logging(self):
         """Set up logging configuration"""
@@ -76,7 +242,129 @@ class NSGTreeWorkflow:
 
         return config
 
-    def run_workflow(self, qfaadir, models, rfaadir=None, output_dir=None):
+    def _find_existing_analysis(self, base_output_dir, analysisname_base, force_new=False):
+        """Find existing analysis directory that matches the current parameters"""
+        if force_new or not base_output_dir.exists():
+            return None
+
+        # Look for directories that start with the analysis name base
+        pattern = f"{analysisname_base}_*"
+        matching_dirs = list(base_output_dir.glob(pattern))
+
+        if not matching_dirs:
+            return None
+
+        # Filter to only resumable analyses and rank by progress
+        resumable_analyses = []
+        for analysis_dir in matching_dirs:
+            if self._is_resumable_analysis(analysis_dir):
+                progress_score = self._calculate_analysis_progress(analysis_dir)
+                resumable_analyses.append((analysis_dir, progress_score))
+
+        if not resumable_analyses:
+            return None
+
+        # Sort by progress score (highest first), then by modification time
+        resumable_analyses.sort(key=lambda x: (x[1], x[0].stat().st_mtime), reverse=True)
+
+        return resumable_analyses[0][0]
+
+    def _calculate_analysis_progress(self, analysis_dir):
+        """Calculate how much progress has been made in an analysis (0-100)"""
+        progress = 0
+
+        # Check each major step completion
+        analyses_dir = analysis_dir / "analyses"
+        if not analyses_dir.exists():
+            return 0
+
+        # Step 1: Reformatted FAA files (10 points)
+        reformatted_dir = analyses_dir / "reformatted_faa"
+        if reformatted_dir.exists() and list(reformatted_dir.glob("*.faa")):
+            progress += 10
+
+        # Step 2: Merged FAA (5 points)
+        merged_faa = analyses_dir / "tmp" / "merged.faa"
+        if merged_faa.exists() and merged_faa.stat().st_size > 0:
+            progress += 5
+
+        # Step 3: HMMsearch (15 points)
+        hmmout_dir = analyses_dir / "hmmout"
+        if hmmout_dir.exists():
+            hmm_files = list(hmmout_dir.glob("*.out"))
+            if hmm_files and any(f.stat().st_size > 0 for f in hmm_files):
+                progress += 15
+
+        # Step 4: Filtering (5 points)
+        if hmmout_dir.exists():
+            filter_files = list(hmmout_dir.glob("*.counts")) + list(hmmout_dir.glob("*.removedtaxa"))
+            if filter_files and any(f.exists() for f in filter_files):
+                progress += 5
+
+        # Step 5: Hit extraction (10 points)
+        hits_dir = analyses_dir / "hits_faa"
+        if hits_dir.exists():
+            hit_files = list(hits_dir.glob("*.faa"))
+            if hit_files:
+                progress += 10
+
+        # Step 6: Alignments (15 points)
+        aligned_t_dir = analyses_dir / "aligned_t"
+        if aligned_t_dir.exists():
+            aligned_files = list(aligned_t_dir.glob("*.mafft_t"))
+            if aligned_files and any(f.stat().st_size > 0 for f in aligned_files):
+                progress += 15
+
+        # Step 7: Protein trees (15 points)
+        proteintrees_dir = analysis_dir / "proteintrees"
+        if proteintrees_dir.exists():
+            tree_files = list(proteintrees_dir.glob("*.treefile"))
+            if tree_files and any(f.stat().st_size > 0 for f in tree_files):
+                progress += 15
+
+        # Step 8: Concatenated alignment (20 points)
+        analysisname = analysis_dir.name
+        concat_file = analysis_dir / f"{analysisname}.mafft_t"
+        if concat_file.exists() and concat_file.stat().st_size > 0:
+            progress += 20
+
+        # Step 9: Species tree (10 points) - if this exists, analysis shouldn't be resumable
+        final_tree = analysis_dir / f"{analysisname}.treefile"
+        if final_tree.exists() and final_tree.stat().st_size > 0:
+            progress += 10
+
+        return progress
+
+    def _is_resumable_analysis(self, analysis_dir):
+        """Check if an analysis directory can be resumed"""
+        if not analysis_dir.is_dir():
+            return False
+
+        # Check if workflow.log exists (indicates it was started)
+        workflow_log = analysis_dir / "workflow.log"
+        if not workflow_log.exists():
+            return False
+
+        # Check if analysis is complete by looking for final tree and completion marker
+        analysisname = analysis_dir.name
+        final_tree = analysis_dir / f"{analysisname}.treefile"
+
+        # If final tree exists and has content, analysis is complete - don't resume
+        if final_tree.exists() and final_tree.stat().st_size > 0:
+            return False
+
+        # Check for species tree completion flag
+        fasttree_complete = analysis_dir / "analyses" / "finaltree" / "fasttree" / f"{analysisname}.complete"
+        iqtree_complete = analysis_dir / "analyses" / "finaltree" / "iqtree" / f"{analysisname}.complete"
+
+        # If species tree is complete, analysis is done - don't resume
+        if (fasttree_complete.exists() or iqtree_complete.exists()):
+            return False
+
+        # This is an incomplete analysis that can be resumed
+        return True
+
+    def run_workflow(self, qfaadir, models, rfaadir=None, output_dir=None, force_new=False):
         """Run the complete NSGTree workflow"""
         try:
             # Initialize paths and variables
@@ -92,30 +380,60 @@ class NSGTreeWorkflow:
             modelscombined = Path(models)
             models_base = modelscombined.stem
 
-            # Create analysis name with timestamp for safety
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            analysisname = str(qfaadir_base +
+            # Create analysis name WITHOUT timestamp for checkpoint detection
+            analysisname_base = str(qfaadir_base +
                 "-" + rfaadir_base +
                 "-" + models_base +
                 "-" + self.config["tmethod"] +
-                "-perc" + str(int(float(self.config["minmarker"])*10)) +
-                "_" + timestamp).replace(".", "")
+                "-perc" + str(int(float(self.config["minmarker"])*10))).replace(".", "")
 
-            # Set up output directory - default to current working directory
+            # Set up output directory and check for existing analysis
             if output_dir:
-                outdir = Path(output_dir) / analysisname
+                base_output_dir = Path(output_dir)
             else:
-                outdir = Path.cwd() / "nsgt_out" / analysisname
-            outdir.mkdir(parents=True, exist_ok=True)
+                base_output_dir = Path.cwd() / "nsgt_out"
+
+            # Look for existing analysis directories
+            existing_analysis = self._find_existing_analysis(base_output_dir, analysisname_base, force_new)
+
+            if existing_analysis:
+                outdir = existing_analysis
+                analysisname = existing_analysis.name
+                self.logger.info(f"Found existing analysis, resuming: {analysisname}")
+                self.logger.info(f"Resume directory: {outdir}")
+            else:
+                # Create new analysis with timestamp
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                analysisname = analysisname_base + "_" + timestamp
+                outdir = base_output_dir / analysisname
+                outdir.mkdir(parents=True, exist_ok=True)
+                self.logger.info(f"Starting new NSGTree workflow: {analysisname}")
+                self.logger.info(f"Output directory: {outdir}")
 
             # Set up workflow log
             self.workflow_log = outdir / "workflow.log"
 
-            self.logger.info(f"Starting NSGTree workflow: {analysisname}")
-            self.logger.info(f"Output directory: {outdir}")
+            # Initialize resource monitor
+            self.resource_monitor = ResourceMonitor(outdir)
 
-            # Write initial log
-            self._write_initial_log()
+            if existing_analysis:
+                self.logger.info(f"Resuming NSGTree workflow: {analysisname}")
+                self.logger.info(f"Resume directory: {outdir}")
+            else:
+                self.logger.info(f"Starting NSGTree workflow: {analysisname}")
+                self.logger.info(f"Output directory: {outdir}")
+
+            self.logger.info(f"Resource monitoring: {'enabled' if self.resource_monitor.time_available else 'disabled'}")
+
+            # Write initial log (only if not resuming)
+            if not existing_analysis:
+                self._write_initial_log()
+            else:
+                # Append resume marker to existing log
+                with open(str(self.workflow_log), 'a') as f:
+                    f.write(f"\n################################\n")
+                    f.write(f"Resuming analysis at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"################################\n")
 
             # Step 1: Reformat FAA files
             self.logger.info("Step 1: Reformatting FAA files")
@@ -166,11 +484,31 @@ class NSGTreeWorkflow:
             self.logger.info("Step 12: Cleaning up and compressing results")
             self._cleanup_and_compress(outdir, analysisname)
 
+            # Generate final resource usage report
+            if self.resource_monitor:
+                resource_report = self.resource_monitor.generate_final_report()
+                self.logger.info("Resource Usage Summary:")
+                self.logger.info(f"  Total Wall Time: {resource_report['total_wall_time_formatted']}")
+                self.logger.info(f"  Total CPU Time: {resource_report['total_cpu_time_formatted']}")
+                self.logger.info(f"  Peak Memory Usage: {resource_report['max_memory_gb']:.3f} GB")
+                self.logger.info(f"  Commands Executed: {resource_report['commands_executed']}")
+                self.logger.info(f"  Resource Log: {self.resource_monitor.resource_log}")
+
             self.logger.info("NSGTree workflow completed successfully!")
             return str(outdir)
 
         except Exception as e:
             self.logger.error(f"Workflow failed: {str(e)}")
+
+            # Generate resource report even on failure
+            if self.resource_monitor:
+                resource_report = self.resource_monitor.generate_final_report()
+                self.logger.error("Resource Usage Summary (at failure):")
+                self.logger.error(f"  Wall Time Used: {resource_report['total_wall_time_formatted']}")
+                self.logger.error(f"  CPU Time Used: {resource_report['total_cpu_time_formatted']}")
+                self.logger.error(f"  Peak Memory Usage: {resource_report['max_memory_gb']:.3f} GB")
+                self.logger.error(f"  Resource Log: {self.resource_monitor.resource_log}")
+
             raise
 
     def _write_initial_log(self):
@@ -187,6 +525,20 @@ class NSGTreeWorkflow:
         """Reformat FAA files"""
         reformatted_faa_dir = outdir / "analyses" / "reformatted_faa"
         reformatted_faa_dir.mkdir(parents=True, exist_ok=True)
+
+        # Check if reformatting is already completed by looking for expected files
+        expected_query_files = len(list(qfaadir.glob("*.faa")))
+        existing_files = len(list(reformatted_faa_dir.glob("*.faa")))
+
+        if rfaadir:
+            expected_ref_files = len(list(rfaadir.glob("*.faa")))
+            expected_total = expected_query_files + expected_ref_files
+        else:
+            expected_total = expected_query_files
+
+        if existing_files >= expected_total and existing_files > 0:
+            self.logger.info(f"Reformatted FAA files already exist ({existing_files} files), skipping reformat step")
+            return reformatted_faa_dir
 
         # Reformat query files
         reformat.main([str(qfaadir), str(reformatted_faa_dir)])
@@ -210,6 +562,11 @@ class NSGTreeWorkflow:
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
         merged_faa = tmp_dir / "merged.faa"
+
+        # Check if merge is already completed
+        if merged_faa.exists() and merged_faa.stat().st_size > 0:
+            self.logger.info("Merged FAA file already exists, skipping merge step")
+            return merged_faa
 
         # Concatenate all FAA files
         with open(merged_faa, 'w') as outfile:
@@ -236,6 +593,11 @@ class NSGTreeWorkflow:
         hmmsearch_output = hmmout_dir / f"{models_base}.out"
         log_file = log_dir / "hmmsearch.log"
 
+        # Check if HMMsearch is already completed
+        if hmmsearch_output.exists() and hmmsearch_output.stat().st_size > 0:
+            self.logger.info("HMMsearch output already exists, skipping HMMsearch step")
+            return hmmsearch_output
+
         # Run hmmsearch
         cmd = [
             "hmmsearch",
@@ -249,7 +611,12 @@ class NSGTreeWorkflow:
 
         with open(log_file, 'w') as f:
             f.write(" ".join(cmd) + "\n")
-            result = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT)
+            if self.resource_monitor:
+                result = self.resource_monitor.run_with_monitoring(
+                    cmd, "HMMsearch", stdout=f, stderr=subprocess.STDOUT
+                )
+            else:
+                result = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT)
 
         if result.returncode != 0:
             raise RuntimeError(f"HMMsearch failed with return code {result.returncode}")
@@ -266,6 +633,12 @@ class NSGTreeWorkflow:
         hitcounts = hmmout_dir / f"{models_base}.counts"
         taxa_removed = hmmout_dir / f"{models_base}.removedtaxa"
         itolcounts = itol_dir / f"{models_base}.counts.itol.txt"
+
+        # Check if filtering is already completed
+        if (hitcounts.exists() and hitcounts.stat().st_size > 0 and
+            taxa_removed.exists() and itolcounts.exists()):
+            self.logger.info("HMMsearch filtering already completed, skipping filter step")
+            return taxa_removed
 
         # Call the filtering script
         args = [
@@ -309,10 +682,23 @@ class NSGTreeWorkflow:
         log_dir = outdir / "analyses" / "log" / "extraction"
         log_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if extraction is already completed for all models
+        expected_files = [hits_dir / f"{model}.faa" for model in models_list]
+        completed_files = [f for f in expected_files if f.exists()]
+
+        if len(completed_files) == len(expected_files):
+            self.logger.info(f"Hit extraction already completed for all {len(models_list)} models, skipping extraction step")
+            return
+
         # Use single-threaded approach for simplicity
         for model in models_list:
             output_file = hits_dir / f"{model}.faa"
             log_file = log_dir / f"{model}.log"
+
+            # Skip if this model is already extracted
+            if output_file.exists():
+                self.logger.info(f"Hits for {model} already extracted, skipping")
+                continue
 
             args = [
                 str(hmmsearch_output),
@@ -349,11 +735,24 @@ class NSGTreeWorkflow:
         log_dir = outdir / "analyses" / "log" / "aln"
         log_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if all alignments are already completed
+        expected_files = [aligned_t_dir / f"{model}.mafft_t" for model in models_list]
+        completed_files = [f for f in expected_files if f.exists() and f.stat().st_size > 0]
+
+        if len(completed_files) == len(expected_files):
+            self.logger.info(f"Alignment and trimming already completed for all {len(models_list)} models, skipping alignment step")
+            return
+
         for model in models_list:
             hits_file = hits_dir / f"{model}.faa"
             aligned_file = aligned_dir / f"{model}.mafft"
             trimmed_file = aligned_t_dir / f"{model}.mafft_t"
             log_file = log_dir / f"{model}.log"
+
+            # Check if alignment and trimming is already completed
+            if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
+                self.logger.info(f"Alignment and trimming for {model} already completed, skipping")
+                continue
 
             try:
                 with open(log_file, 'w') as f:
@@ -370,7 +769,12 @@ class NSGTreeWorkflow:
 
                     if hits_file.exists() and hits_file.stat().st_size > 0:
                         with open(aligned_file, 'w') as align_out:
-                            result = subprocess.run(mafft_cmd, stdout=align_out, stderr=f, timeout=300)
+                            if self.resource_monitor:
+                                result = self.resource_monitor.run_with_monitoring(
+                                    mafft_cmd, f"MAFFT-{model}", stdout=align_out, stderr=f
+                                )
+                            else:
+                                result = subprocess.run(mafft_cmd, stdout=align_out, stderr=f)
                     else:
                         aligned_file.touch()
 
@@ -381,7 +785,12 @@ class NSGTreeWorkflow:
                     trimal_cmd.extend(["-in", str(aligned_file), "-out", str(trimmed_file)])
 
                     if aligned_file.exists() and aligned_file.stat().st_size > 0:
-                        result = subprocess.run(trimal_cmd, stderr=f, timeout=300)
+                        if self.resource_monitor:
+                            result = self.resource_monitor.run_with_monitoring(
+                                trimal_cmd, f"Trimal-{model}", stderr=f
+                            )
+                        else:
+                            result = subprocess.run(trimal_cmd, stderr=f)
                     else:
                         trimmed_file.touch()
 
@@ -408,11 +817,28 @@ class NSGTreeWorkflow:
         log_dir = outdir / "analyses" / "log" / "trees"
         log_dir.mkdir(parents=True, exist_ok=True)
 
+        # Check if all protein trees are already completed
+        expected_flags = [analysis_dir / f"{model}.complete" for model in models_list]
+        expected_trees = [proteintrees_dir / f"{model}.treefile" for model in models_list]
+        completed_trees = [
+            i for i, (flag, tree) in enumerate(zip(expected_flags, expected_trees))
+            if flag.exists() and tree.exists() and tree.stat().st_size > 0
+        ]
+
+        if len(completed_trees) == len(models_list):
+            self.logger.info(f"Protein trees already completed for all {len(models_list)} models, skipping tree building step")
+            return
+
         for model in models_list:
             trimmed_file = aligned_t_dir / f"{model}.mafft_t"
             tree_file = proteintrees_dir / f"{model}.treefile"
             log_file = log_dir / f"{model}.log"
             complete_flag = analysis_dir / f"{model}.complete"
+
+            # Check if tree is already completed
+            if complete_flag.exists() and tree_file.exists() and tree_file.stat().st_size > 0:
+                self.logger.info(f"Tree for {model} already exists, skipping")
+                continue
 
             try:
                 with open(log_file, 'w') as f:
@@ -426,7 +852,12 @@ class NSGTreeWorkflow:
 
                         if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
                             with open(tree_file, 'w') as tree_out:
-                                result = subprocess.run(cmd, stdout=tree_out, stderr=f, timeout=600)
+                                if self.resource_monitor:
+                                    result = self.resource_monitor.run_with_monitoring(
+                                        cmd, f"FastTree-protein-{model}", stdout=tree_out, stderr=f
+                                    )
+                                else:
+                                    result = subprocess.run(cmd, stdout=tree_out, stderr=f)
                         else:
                             tree_file.touch()
 
@@ -443,7 +874,12 @@ class NSGTreeWorkflow:
                         ]
 
                         if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
-                            result = subprocess.run(cmd, stderr=f, timeout=600)
+                            if self.resource_monitor:
+                                result = self.resource_monitor.run_with_monitoring(
+                                    cmd, f"IQ-TREE-protein-{model}", stderr=f
+                                )
+                            else:
+                                result = subprocess.run(cmd, stderr=f)
                             # Copy appropriate tree file
                             contree = f"{outpath}.contree"
                             treefile = f"{outpath}.treefile"
@@ -469,8 +905,12 @@ class NSGTreeWorkflow:
         aligned_t_dir = outdir / "analyses" / "aligned_t"
         concat_aln = outdir / f"{analysisname}.mafft_t"
 
-        # Use the concat script
-        concat.main([str(aligned_t_dir), str(concat_aln)])
+        # Check if concatenation is already completed
+        if concat_aln.exists() and concat_aln.stat().st_size > 0:
+            self.logger.info(f"Concatenated alignment already exists, skipping concatenation")
+        else:
+            # Use the concat script
+            concat.main([str(aligned_t_dir), str(concat_aln)])
 
         # Count genomes in final alignment
         if concat_aln.exists() and concat_aln.stat().st_size > 0:
@@ -495,6 +935,14 @@ class NSGTreeWorkflow:
         species_tree = finaltree_dir / f"{analysisname}.treefile"
         concat_tree = outdir / f"{analysisname}.treefile"
         complete_flag = finaltree_dir / f"{analysisname}.complete"
+
+        # Check if species tree is already completed
+        if complete_flag.exists() and species_tree.exists() and species_tree.stat().st_size > 0:
+            self.logger.info(f"Species tree already exists and is complete, skipping reconstruction")
+            # Ensure the final tree is copied to the main output directory
+            if not concat_tree.exists() or concat_tree.stat().st_size == 0:
+                shutil.copy(species_tree, concat_tree)
+            return
 
         log_file = outdir / "analyses" / "log" / "trees" / "speciestree.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -533,7 +981,12 @@ class NSGTreeWorkflow:
                 self.logger.info(f"Running FastTree: {' '.join(cmd)}")
 
                 with open(species_tree, 'w') as tree_out:
-                    result = subprocess.run(cmd, stdout=tree_out, stderr=f, timeout=1800)
+                    if self.resource_monitor:
+                        result = self.resource_monitor.run_with_monitoring(
+                            cmd, "FastTree-species", stdout=tree_out, stderr=f
+                        )
+                    else:
+                        result = subprocess.run(cmd, stdout=tree_out, stderr=f)
                     if result.returncode != 0:
                         self.logger.error(f"FastTree failed with return code {result.returncode}")
 
@@ -549,7 +1002,12 @@ class NSGTreeWorkflow:
                 ]
 
                 f.write(" ".join(cmd) + "\n")
-                result = subprocess.run(cmd, stderr=f, timeout=1800)
+                if self.resource_monitor:
+                    result = self.resource_monitor.run_with_monitoring(
+                        cmd, "IQ-TREE-species", stderr=f
+                    )
+                else:
+                    result = subprocess.run(cmd, stderr=f)
 
                 # Copy tree files
                 shutil.copy(f"{outpath}.treefile", species_tree)
@@ -687,6 +1145,8 @@ Example usage:
                        help='Enable verbose logging')
     parser.add_argument('--interactive', '-i', action='store_true',
                        help='Enable interactive mode with confirmation prompts (default: False, runs automatically)')
+    parser.add_argument('--force-new', action='store_true',
+                       help='Force a new analysis instead of resuming existing incomplete analysis')
 
     args = parser.parse_args()
 
@@ -722,7 +1182,8 @@ Example usage:
         result_dir = workflow.run_workflow(
             qfaadir=args.qfaadir,
             models=args.models,
-            rfaadir=args.rfaadir
+            rfaadir=args.rfaadir,
+            force_new=args.force_new
         )
         print(f"NSGTree analysis completed successfully!")
         print(f"Results saved to: {result_dir}")
