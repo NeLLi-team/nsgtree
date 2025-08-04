@@ -1,0 +1,14 @@
+#!/bin/bash
+# NSGTree wrapper script - makes running NSGTree much simpler
+
+# This script simplifies the NSGTree command from:
+#   pixi run python nsgtree_main.py run --help
+# To just:
+#   ./nsgt --help
+
+# Make sure we're in the right directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Run NSGTree with all passed arguments
+exec pixi run nsgtree "$@"

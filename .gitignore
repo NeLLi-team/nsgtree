@@ -26,3 +26,4 @@ examplegv/
 test_output/
 my_custom_results/
 RELEASE_NOTES_v*.md
+nsgtree/main.py.backup

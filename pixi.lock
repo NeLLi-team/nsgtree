@@ -3035,13 +3035,17 @@ packages:
   timestamp: 1738196177597
 - pypi: ./
   name: nsgtree
-  version: 0.5.0
-  sha256: 35b16438f67d5cdd941af77d80cc0c270a3e1c52b08f54c179bce13384df20c3
+  version: 0.6.5
+  sha256: 552c08484632046f6d7f92b3edfe39b2d13b6a3966aebe24257c327ecea89872
   requires_dist:
-  - biopython
-  - pandas
-  - numpy
-  - scipy
+  - biopython>=1.78
+  - pandas>=1.5
+  - numpy>=1.23
+  - scipy>=1.9
+  - pyyaml>=6.0
+  - ete3>=3.1
+  - typer>=0.9.0
+  - rich>=13.0.0
   requires_python: '>=3.10'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/nspr-4.37-h29cc59b_0.conda

@@ -1,246 +1,217 @@
 # NSGTree - New Simple Genome Tree
 
-_v0.5.1 August 2025_
+Build phylogenetic trees from your genomes in just one command!
 
-NSGTree is a computational pipeline for fast and easy construction of phylogenetic trees from a set of user-provided genomes and phylogenetic markers. It builds species trees based on concatenated alignments of proteins identified with HMM markers, and also constructs individual protein trees for each marker.
+NSGTree takes a folder of genome files (.faa format) and builds a phylogenetic tree showing how they're related. It's designed to be simple to use while producing publication-quality results.
 
-This version uses **Pixi** for simplified installation and dependency management, with a modern **Typer-based CLI** that makes it extremely easy to use for the scientific community.
+## What NSGTree Does
 
-## Why NSGTree?
+1. **Finds marker proteins** in your genomes using HMM models
+2. **Aligns sequences** of the same proteins across genomes
+3. **Builds phylogenetic trees** showing evolutionary relationships
+4. **Creates visualizations** ready for publication
 
-- **Fast**: 20-50% faster than SGTree depending on dataset size
-- **Simple**: Modern CLI with comprehensive help and examples
-- **Reliable**: Pure Python implementation with comprehensive error handling
-- **Safe**: Timestamped output directories prevent accidental overwrites
-- **Flexible**: Supports various tree-building methods (FastTree, IQ-TREE)
-- **User-Friendly**: Rich terminal interface with progress bars and beautiful output
-- **HPC-Ready**: Runs automatically without prompts by default, with optional interactive mode
+Perfect for comparative genomics, phylogenetic placement, and understanding evolutionary relationships!
+
+## Key Features
+
+✅ **One-command analysis** - Just point it at your genome files
+✅ **Fast** - Builds trees 20-50% faster than similar tools
+✅ **Easy to install** - All dependencies installed automatically
+✅ **Safe** - Each run gets its own timestamped folder
+✅ **Visualization ready** - Outputs work directly with tree viewers
 
 ## Installation
 
-### Prerequisites
-First install Pixi (modern conda-compatible package manager):
+### Step 1: Install Pixi
+
+First install Pixi (a modern package manager):
+
 ```bash
 curl -fsSL https://pixi.sh/install.sh | bash
 ```
 
-### Install NSGTree
+### Step 2: Install NSGTree
+
 ```bash
 git clone https://github.com/NeLLi-team/nsgtree.git
 cd nsgtree
 pixi install
 ```
 
-That's it! All dependencies (MAFFT, trimAl, FastTree, IQ-TREE, HMMER, ete3, etc.) are automatically installed.
+### Step 3: Choose Your Preferred Command Style
 
-## Usage
+After installation, you have several ways to run NSGTree:
 
-### Getting Started
+**Option A: Use the simple wrapper script (recommended)**
+```bash
+./nsgt --help                                      # Show help
+./nsgt run my_genomes resources/models/rnapol.hmm  # Run analysis
+```
 
-NSGTree provides a comprehensive CLI with built-in help and examples:
+**Option B: Use pixi shortcuts**
+```bash
+pixi run help                                      # Show help
+pixi run run my_genomes resources/models/rnapol.hmm  # Run analysis
+pixi run test-rnapol                               # Quick test
+```
+
+**Option C: Install as a command-line tool**
+```bash
+./install.sh    # Run this once
+nsgtree --help  # Then use 'nsgtree' directly
+```
+
+## Quick Start
+
+### Basic Usage
+
+Build a tree from your genome files in one command:
 
 ```bash
-# Show available commands
-pixi run python nsgtree_main.py --help
+# Basic analysis - put your .faa files in a folder called "my_genomes"
+./nsgt run my_genomes resources/models/rnapol.hmm
 
-# Show example usage patterns
-pixi run python nsgtree_main.py examples
-
-# List available HMM models
-pixi run python nsgtree_main.py models --list
-
-# Check your system and input files
-pixi run python nsgtree_main.py check example resources/models/rnapol.hmm
+# Use more CPU cores (faster)
+./nsgt run my_genomes resources/models/rnapol.hmm -j 16
 ```
 
-### Basic Analysis
+### Try the Examples
+
+Test with included example data:
 
 ```bash
-# Run with query genomes only
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm
+# Test with small RNA polymerase markers (fast, ~2 minutes)
+./nsgt run example resources/models/rnapol.hmm
 
-# Run with query and reference genomes for comparative analysis
-pixi run python nsgtree_main.py run example_q resources/models/UNI56.hmm -r example_r
+# Test with comprehensive protein markers (more accurate, ~10 minutes)
+./nsgt run example resources/models/UNI56.hmm
 
-# Use more CPU cores for faster processing
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -j 16
+# Or use the pre-built shortcuts:
+pixi run test-rnapol
+pixi run test-uni56
 ```
 
-### Advanced Options
+### What You Need
 
-```bash
-# Custom output directory (default: ./nsgt_out/ with timestamp)
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -o my_analysis
+1. **Genome files**: Put your protein FASTA files (.faa) in a folder
+2. **Choose markers**: Pick from pre-built marker sets (see below)
 
-# Use IQ-TREE instead of FastTree for more accurate trees
-pixi run python nsgtree_main.py run example resources/models/UNI56.hmm -t iqtree
+That's it!
 
-# Custom configuration file
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -c user_config.yml
+## Available Marker Sets
 
-# Enable verbose logging to see detailed progress
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm -v
+NSGTree includes several pre-built marker sets for different purposes:
 
-# Dry run to see what would be done without executing
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --dry-run
+- **`rnapol.hmm`**: RNA polymerase (3 proteins) - Fast, good for initial analysis
+- **`UNI56.hmm`**: Universal markers (56 proteins) - Most comprehensive
+- **`gtdbbac.hmm`**: Bacterial-specific markers
+- **`gtdbarc.hmm`**: Archaeal-specific markers
 
-# Interactive mode with confirmation prompts (useful for manual analysis)
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm --interactive
-```
+## Understanding Your Results
 
-### Command Reference
-
-**Main Commands:**
-- `run`: Execute complete phylogenetic analysis
-- `models`: Manage and list HMM model files
-- `examples`: Show usage examples and scenarios
-- `check`: Validate input files and system requirements
-
-**Run Command Options:**
-- `qfaadir`: Directory containing query FAA files (required)
-- `models`: Path to HMM models file (required)
-- `-r, --rfaadir`: Directory containing reference FAA files (optional)
-- `-o, --output-name`: Custom output directory name (optional)
-- `-c, --config`: User configuration file in YAML format (optional)
-- `-j, --cores`: Number of CPU cores to use (default: 8)
-- `-t, --tree-method`: Tree building method: 'fasttree' or 'iqtree' (optional)
-- `-m, --min-marker`: Minimum fraction of markers required per genome (optional)
-- `-i, --interactive`: Enable interactive mode with confirmation prompts (optional)
-- `-v, --verbose`: Enable verbose logging
-- `--dry-run`: Show what would be done without executing
-
-### Example Datasets
-The repository includes example datasets:
-- `example/`: 12 genome FAA files for testing
-- `example_q/`: Query genomes
-- `example_r/`: Reference genomes
-
-### Available Models
-Pre-built HMM models are provided in `resources/models/`:
-- `rnapol.hmm`: RNA polymerase markers (3 proteins)
-- `UNI56.hmm`: Universal single-copy markers (56 proteins)
-- `gtdbbac.hmm`: GTDB bacterial markers
-- `gtdbarc.hmm`: GTDB archaeal markers
-- And more...
-
-## Configuration
-
-Customize analysis parameters in `user_config.yml`:
-
-```yaml
-# Tree building method
-tmethod: "fasttree"  # or "iqtree"
-
-# Filtering thresholds
-minmarker: "0.1"     # Minimum fraction of markers required per genome
-maxsdup: "1.5"       # Maximum single-copy duplicates allowed
-maxdupl: "3.0"       # Maximum duplicates allowed
-
-# Tool-specific parameters
-trimal_gt: "-gt 0.5"
-ft_speciestree: "-spr 4 -mlacc 3 -slownni -lg"
-iq_speciestree: "LG+F+R10"
-```
-
-## Output
-
-Results are saved to timestamped directories in `./nsgt_out/` (or custom directory with `-o`):
+Results are saved in `./nsgt_out/` with a timestamp:
 
 ```
-./nsgt_out/example--rnapol-fasttree-perc1_20250801_152613/
+./nsgt_out/my_analysis_20250804_143022/
+  ├── my_analysis_20250804_143022.treefile  ← Your phylogenetic tree
+  ├── my_analysis_20250804_143022.mafft_t   ← Protein alignment used
+  ├── proteintrees/                         ← Individual protein trees
+  └── itol/                                 ← Files for tree visualization
 ```
 
-**Key Output Files:**
-- `<analysis_name>.treefile`: Final species tree (Newick format)
-- `<analysis_name>.mafft_t`: Concatenated alignment
-- `proteintrees/`: Individual protein trees for each marker
-- `itol/`: Tree visualization files for ITOL (Interactive Tree of Life)
-  - `query_genomes.txt`: List of query genomes
-  - `*_clades.itol`: ITOL annotation file for highlighting query clades
-  - `*_neighbors.pairs`: Nearest neighbor relationships (when references provided)
-  - `*_analysis_summary.txt`: Summary of analysis and visualization files
-- `analyses.tar.gz`: Compressed intermediate results
-- `workflow.log`: Analysis log
-
-**Safety Features:**
-- **Timestamped directories**: Each run gets a unique directory with `YYYYMMDD_HHMMSS` timestamp
-- **No overwrites**: Multiple analyses never conflict or overwrite each other
-- **Organized output**: All results clearly separated by timestamp
-
-## Performance Notes
-
-- **FastTree** (default): Fast approximate ML trees, good for large datasets
-- **IQ-TREE**: More accurate ML trees with model selection, slower
-- Processing time scales with number of genomes and HMM models
-- Memory usage is generally modest (<8GB for typical datasets)
-
-## Troubleshooting
-
-1. **Empty tree files**: Check filtering thresholds - increase `minmarker` or decrease `maxsdup`/`maxdupl`
-2. **MAFFT errors**: Ensure sequences are properly formatted FASTA files
-3. **Memory issues**: Reduce `--cores` parameter
-4. **No hits found**: Check that your genomes contain the expected proteins for your HMM models
-
-## Quick Start Example
-
-```bash
-cd nsgtree
-
-# Show help and available commands
-pixi run python nsgtree_main.py --help
-
-# Run example analysis
-pixi run python nsgtree_main.py run example resources/models/rnapol.hmm
-```
-
-This analyzes 12 example genomes using RNA polymerase markers and completes in about 5 minutes, producing a species tree in `./nsgt_out/example--rnapol-fasttree-perc1_YYYYMMDD_HHMMSS/`.
+**Key file**: The `.treefile` contains your phylogenetic tree in standard Newick format.
 
 ## Tree Visualization
 
-NSGTree automatically generates visualization files for use with ITOL (Interactive Tree of Life):
+Upload your `.treefile` to any tree viewer:
 
-1. **Upload your tree**: Go to https://itol.embl.de/ and upload your `.treefile`
-2. **Add annotations**: Use the generated `.itol` files to highlight query clades in different colors
-3. **Analyze relationships**: Check the `.pairs` files for nearest neighbor relationships
-4. **Customize visualization**: Use ITOL's web interface for additional styling and analysis
+- **Online**: [iTOL](https://itol.embl.de) (free, web-based)
+- **Desktop**: FigTree, Dendroscope, or similar
 
-The visualization files help you:
-- **Identify monophyletic groups**: See which query genomes cluster together
-- **Highlight query taxa**: Distinguish your genomes from references in the tree
-- **Find closest relatives**: Understand phylogenetic relationships between queries and references
+The `itol/` folder contains files to color and annotate your tree automatically.
 
-## What's New in the Pixi Version
+## Common Options
 
-### Modern CLI Interface
-- **Comprehensive Help System**: Built-in examples, model management, and system checking
-- **Rich Terminal Interface**: Beautiful progress bars, tables, and colored output
-- **Interactive Confirmations**: Safe execution with confirmation prompts
-- **Command Validation**: Built-in checks for input files and system requirements
+```bash
+# Use a different tree-building method (more accurate but slower)
+./nsgt run my_genomes resources/models/UNI56.hmm -t iqtree
 
-### Enhanced Safety & Usability
-- **Timestamped Output Directories**: Each analysis gets a unique directory (no more overwrites!)
-- **Current Directory Output**: Results saved to `./nsgt_out/` by default (much more intuitive)
-- **Custom Output Names**: Use `-o` to specify custom output directory names
-- **Dry Run Mode**: See what will be done before executing with `--dry-run`
+# Custom output folder name
+./nsgt run my_genomes resources/models/rnapol.hmm -o my_analysis
 
-### Improved Phylogenetic Analysis
-- **Enhanced ete3 Integration**: Full tree visualization and analysis capabilities
-- **Working Nearest Neighbor Analysis**: Find closest relatives for query genomes
-- **Comprehensive Tree Analysis**: Automatic clade detection and ITOL annotation generation
-- **Robust Error Handling**: Better error messages and recovery from failures
+# Verbose output to see what's happening
+./nsgt run my_genomes resources/models/rnapol.hmm -v
+```
 
-### Technical Improvements
-- **Simplified Installation**: Single `pixi install` command handles all dependencies
-- **Cross-Platform Support**: Works on Linux, macOS, and Windows (with WSL)
-- **Better Dependency Management**: Automatic handling of bioinformatics tools
-- **Performance Optimizations**: Faster execution and better resource usage
+## Getting Help
 
-### For Scientists
-- **Example-Driven Documentation**: Learn by example with built-in usage patterns
-- **Model Management**: Easy listing and selection of HMM models
-- **System Validation**: Check your setup before running analyses
-- **Visualization Ready**: Automatic generation of publication-ready tree files
+```bash
+# Show all available commands
+./nsgt --help
 
-## Acknowledgements
+# Show examples
+./nsgt examples
 
-NSGTree was developed by the [New Lineages of Life Group](https://jgi.doe.gov/our-science/scientists-jgi/new-lineages-of-life/) at the DOE Joint Genome Institute, supported by the Office of Science of the U.S. Department of Energy under contract no. DE-AC02-05CH11231.
+# List available marker sets
+./nsgt models --list
+
+# Check if your files are formatted correctly
+./nsgt check my_genomes resources/models/rnapol.hmm
+```
+## Troubleshooting
+
+**Problem**: No tree file generated
+- **Solution**: Your genomes may not contain the expected proteins. Try a different marker set or check that your .faa files contain protein sequences.
+
+**Problem**: Analysis runs slowly
+- **Solution**: Use more CPU cores with `-j 16` (or however many cores you have)
+
+**Problem**: "No .faa files found" error
+- **Solution**: Make sure your protein files end with `.faa` and are in FASTA format
+
+**Problem**: Out of memory errors
+- **Solution**: Use fewer CPU cores with `-j 4` or analyze fewer genomes at once
+
+## Advanced Usage
+
+### Custom Configuration
+
+For advanced users, create a config file to set custom parameters:
+
+```yaml
+# my_config.yml
+cores: 32                    # Use all your CPU cores
+tmethod: "iqtree"           # Use IQ-TREE for more accurate trees
+minmarker: 0.2              # Require at least 20% of markers per genome
+```
+
+Then run with:
+
+```bash
+./nsgt run my_genomes resources/models/UNI56.hmm -c my_config.yml
+```
+
+### All Command Options
+
+```bash
+./nsgt run GENOME_FOLDER MARKER_FILE [OPTIONS]
+
+Options:
+  -j, --cores INTEGER          Number of CPU cores to use
+  -t, --tree-method TEXT       Tree method: 'fasttree' or 'iqtree'
+  -m, --min-marker FLOAT       Minimum fraction of markers per genome
+  -o, --output-name TEXT       Custom output folder name
+  -c, --config TEXT           Configuration file
+  -v, --verbose               Show detailed progress
+  --dry-run                   Preview what will be done
+  -r, --rfaadir TEXT          Reference genomes folder
+```
+
+## Acknowledgments
+
+NSGTree was developed by the [New Lineages of Life Group](https://jgi.doe.gov/our-science/scientists-jgi/new-lineages-of-life/) at the DOE Joint Genome Institute.
+
+## Version
+
+NSGTree v0.6.5 - August 2025

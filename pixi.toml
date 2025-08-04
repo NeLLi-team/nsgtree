@@ -1,6 +1,6 @@
 [project]
 name = "nsgtree"
-version = "0.5.1"
+version = "0.6.5"
 description = "New SGTree: Build genome tree from concatenated alignment after hmmsearch using a set of user provided HMMs"
 authors = ["Frederik Schulz <fschulz@lbl.gov>", "Juan C. Villada <jvillada@lbl.gov>"]
 channels = ["conda-forge", "bioconda"]
@@ -20,17 +20,26 @@ hmmer = ">=3.3"
 mafft = ">=7.3"
 trimal = ">=1.4"
 fasttree = ">=2.1"
-iqtree = ">=2.0"
 veryfasttree = ">=4.0"
+iqtree = ">=2.0"
 pyyaml = ">=6.0"
 ete3 = ">=3.1"
 typer = ">=0.9.0"
 rich = ">=13.0.0"
 
 [tasks]
+# Simple shortcuts for common commands
 install = "pip install -e ."
 nsgtree = "python nsgtree_main.py"
 help = "python nsgtree_main.py --help"
+run = "python nsgtree_main.py run"
+models = "python nsgtree_main.py models --list"
+examples = "python nsgtree_main.py examples"
+check = "python nsgtree_main.py check"
+
+# Quick analysis shortcuts
+test-rnapol = "python nsgtree_main.py run example resources/models/rnapol.hmm"
+test-uni56 = "python nsgtree_main.py run example resources/models/UNI56.hmm"
 
 [pypi-dependencies]
 nsgtree = { path = ".", editable = true }

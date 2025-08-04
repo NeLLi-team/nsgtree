@@ -15,6 +15,8 @@ from pathlib import Path
 import tempfile
 from datetime import datetime
 import json
+import multiprocessing as mp
+from functools import partial
 
 from .scripts import reformat
 from .scripts import hmmsearch_count_filter
@@ -204,6 +206,24 @@ class NSGTreeWorkflow:
         )
         return logging.getLogger(__name__)
 
+    def _get_actual_tree_method(self):
+        """Determine the actual tree building tool that will be used"""
+        if self.config["tmethod"] == "fasttree":
+            ft_variant = self.config.get("ft_variant", "auto").lower()
+
+            if ft_variant == "veryfasttree":
+                return "veryfasttree"
+            elif ft_variant == "fasttree":
+                return "fasttree"
+            else:
+                # Auto mode: choose based on threading needs
+                if int(self.config["tree_cpus"]) > 1:
+                    return "veryfasttree"
+                else:
+                    return "fasttree"
+        else:
+            return "iqtree"
+
     def _load_config(self, config_file, user_config_file):
         """Load configuration from YAML files"""
         # Load default config
@@ -212,6 +232,7 @@ class NSGTreeWorkflow:
             # Fallback to basic config
             config = {
                 'tmethod': 'fasttree',
+                'ft_variant': 'auto',
                 'rfaadir': '',
                 'hmmsearch_cutoff': '-E 1e-5',
                 'hmmsearch_cpu': '8',
@@ -381,11 +402,13 @@ class NSGTreeWorkflow:
             models_base = modelscombined.stem
 
             # Create analysis name WITHOUT timestamp for checkpoint detection
+            actual_tree_method = self._get_actual_tree_method()
+            minmarker_perc = str(int(float(self.config["minmarker"]) * 100))
             analysisname_base = str(qfaadir_base +
                 "-" + rfaadir_base +
                 "-" + models_base +
-                "-" + self.config["tmethod"] +
-                "-perc" + str(int(float(self.config["minmarker"])*10))).replace(".", "")
+                "-" + actual_tree_method +
+                "-minmarkerPerc" + minmarker_perc).replace(".", "")
 
             # Set up output directory and check for existing analysis
             if output_dir:
@@ -801,6 +824,103 @@ class NSGTreeWorkflow:
                 aligned_file.touch()
                 trimmed_file.touch()
 
+    def _build_single_protein_tree(self, model, outdir, tree_method, config, resource_monitor=None):
+        """Build a single protein tree - designed for parallel execution"""
+        aligned_t_dir = outdir / "analyses" / "aligned_t"
+        proteintrees_dir = outdir / "proteintrees"
+
+        if tree_method == "fasttree":
+            analysis_dir = outdir / "analyses" / "proteintrees" / "fasttree"
+        else:
+            analysis_dir = outdir / "analyses" / "proteintrees" / "iqtree"
+
+        log_dir = outdir / "analyses" / "log" / "trees"
+
+        trimmed_file = aligned_t_dir / f"{model}.mafft_t"
+        tree_file = proteintrees_dir / f"{model}.treefile"
+        complete_flag = analysis_dir / f"{model}.complete"
+        log_file = log_dir / f"{model}.log"
+
+        # Skip if already completed
+        if complete_flag.exists() and tree_file.exists() and tree_file.stat().st_size > 0:
+            return f"Tree for {model} already exists, skipping"
+
+        try:
+            with open(log_file, 'w') as f:
+                if tree_method == "fasttree":
+                    # Choose FastTree variant based on configuration
+                    ft_variant = config.get("ft_variant", "auto").lower()
+
+                    if ft_variant == "veryfasttree":
+                        # Force VeryFastTree (single thread for parallel execution)
+                        cmd = ["VeryFastTree", "-threads", "1", str(trimmed_file)]
+                        tool_name = "VeryFastTree"
+                    elif ft_variant == "fasttree":
+                        # Force regular FastTree
+                        cmd = ["fasttree", str(trimmed_file)]
+                        tool_name = "FastTree"
+                    else:
+                        # Auto mode: choose based on system capabilities
+                        if config.get("tree_cpus", "1") != "1":
+                            # Multi-core system: use VeryFastTree
+                            cmd = ["VeryFastTree", "-threads", "1", str(trimmed_file)]
+                            tool_name = "VeryFastTree"
+                        else:
+                            # Single-core system: use FastTree
+                            cmd = ["fasttree", str(trimmed_file)]
+                            tool_name = "FastTree"
+
+                    if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
+                        with open(tree_file, 'w') as tree_out:
+                            if resource_monitor:
+                                result = resource_monitor.run_with_monitoring(
+                                    cmd, f"{tool_name}-protein-{model}", stdout=tree_out, stderr=f
+                                )
+                            else:
+                                result = subprocess.run(cmd, stdout=tree_out, stderr=f)
+                    else:
+                        tree_file.touch()
+
+                else:
+                    # IQ-TREE - use 1 thread per tree when running in parallel
+                    outpath = analysis_dir / model
+                    cmd = [
+                        "iqtree",
+                        "--prefix", str(outpath),
+                        "-m", config["iq_proteintrees"],
+                        "-T", "1",
+                        "-fast",
+                        "-s", str(trimmed_file)
+                    ]
+
+                    if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
+                        if resource_monitor:
+                            result = resource_monitor.run_with_monitoring(
+                                cmd, f"IQ-TREE-protein-{model}", stderr=f
+                            )
+                        else:
+                            result = subprocess.run(cmd, stderr=f)
+                        # Copy appropriate tree file
+                        contree = f"{outpath}.contree"
+                        treefile = f"{outpath}.treefile"
+                        if os.path.exists(contree):
+                            shutil.copy(contree, tree_file)
+                        elif os.path.exists(treefile):
+                            shutil.copy(treefile, tree_file)
+                        else:
+                            tree_file.touch()
+                    else:
+                        tree_file.touch()
+
+                # Mark as complete
+                complete_flag.touch()
+                return f"Successfully built tree for {model}"
+
+        except Exception as e:
+            # Mark as complete even on error to avoid infinite retries
+            complete_flag.touch()
+            return f"Failed to build tree for {model}: {str(e)}"
+
     def _build_trees_parallel(self, models_list, outdir):
         """Build individual protein trees"""
         aligned_t_dir = outdir / "analyses" / "aligned_t"
@@ -829,76 +949,46 @@ class NSGTreeWorkflow:
             self.logger.info(f"Protein trees already completed for all {len(models_list)} models, skipping tree building step")
             return
 
-        for model in models_list:
-            trimmed_file = aligned_t_dir / f"{model}.mafft_t"
-            tree_file = proteintrees_dir / f"{model}.treefile"
-            log_file = log_dir / f"{model}.log"
-            complete_flag = analysis_dir / f"{model}.complete"
+        # Use new parallel processing approach
+        self._build_trees_parallel_new(models_list, completed_trees, outdir)
 
-            # Check if tree is already completed
-            if complete_flag.exists() and tree_file.exists() and tree_file.stat().st_size > 0:
-                self.logger.info(f"Tree for {model} already exists, skipping")
-                continue
+    def _build_trees_parallel_new(self, models_list, completed_trees, outdir):
+        """Build protein trees using parallel processing for better CPU utilization"""
+        # Determine how many models still need processing
+        remaining_models = [model for i, model in enumerate(models_list) if i not in completed_trees]
 
-            try:
-                with open(log_file, 'w') as f:
-                    if self.config["tmethod"] == "fasttree":
-                        # FastTree
-                        cmd = [
-                            "fasttree",
-                            "-threads", "1",  # Use 1 thread per process
-                            str(trimmed_file)
-                        ]
+        if not remaining_models:
+            self.logger.info("All protein trees already completed")
+            return
 
-                        if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
-                            with open(tree_file, 'w') as tree_out:
-                                if self.resource_monitor:
-                                    result = self.resource_monitor.run_with_monitoring(
-                                        cmd, f"FastTree-protein-{model}", stdout=tree_out, stderr=f
-                                    )
-                                else:
-                                    result = subprocess.run(cmd, stdout=tree_out, stderr=f)
-                        else:
-                            tree_file.touch()
+        self.logger.info(f"Building protein trees for {len(remaining_models)} models using parallel processing")
 
-                    else:
-                        # IQ-TREE
-                        outpath = analysis_dir / model
-                        cmd = [
-                            "iqtree",
-                            "--prefix", str(outpath),
-                            "-m", self.config["iq_proteintrees"],
-                            "-T", "1",
-                            "-fast",
-                            "-s", str(trimmed_file)
-                        ]
+        # Use parallel processing for protein tree building
+        num_cores = int(self.config["tree_cpus"])
+        num_processes = min(num_cores, len(remaining_models))  # Don't use more processes than models
 
-                        if trimmed_file.exists() and trimmed_file.stat().st_size > 0:
-                            if self.resource_monitor:
-                                result = self.resource_monitor.run_with_monitoring(
-                                    cmd, f"IQ-TREE-protein-{model}", stderr=f
-                                )
-                            else:
-                                result = subprocess.run(cmd, stderr=f)
-                            # Copy appropriate tree file
-                            contree = f"{outpath}.contree"
-                            treefile = f"{outpath}.treefile"
-                            if os.path.exists(contree):
-                                shutil.copy(contree, tree_file)
-                            elif os.path.exists(treefile):
-                                shutil.copy(treefile, tree_file)
-                            else:
-                                tree_file.touch()
-                        else:
-                            tree_file.touch()
+        if num_processes > 1:
+            # Use multiprocessing for parallel tree building
+            build_tree_func = partial(
+                self._build_single_protein_tree,
+                outdir=outdir,
+                tree_method=self.config["tmethod"],
+                config=self.config,
+                resource_monitor=None  # Can't pass resource_monitor to subprocess
+            )
 
-                complete_flag.touch()
-                self.logger.info(f"Built tree for {model}")
-            except Exception as e:
-                self.logger.error(f"Failed to build tree for {model}: {str(e)}")
-                # Create empty files to continue pipeline
-                tree_file.touch()
-                complete_flag.touch()
+            with mp.Pool(processes=num_processes) as pool:
+                results = pool.map(build_tree_func, remaining_models)
+
+            for result in results:
+                self.logger.info(result)
+        else:
+            # Sequential processing for single core
+            for model in remaining_models:
+                result = self._build_single_protein_tree(
+                    model, outdir, self.config["tmethod"], self.config, self.resource_monitor
+                )
+                self.logger.info(result)
 
     def _concatenate_alignments(self, models_list, outdir, analysisname):
         """Concatenate alignments"""
@@ -963,10 +1053,27 @@ class NSGTreeWorkflow:
 
         with open(log_file, 'w') as f:
             if self.config["tmethod"] == "fasttree":
-                # FastTree - simplified command (no threading support in this version)
-                cmd = ["fasttree"]
+                # Choose FastTree variant based on configuration and threading needs
+                ft_variant = self.config.get("ft_variant", "auto").lower()
 
-                # Add other fasttree parameters (skip threading options)
+                if ft_variant == "veryfasttree":
+                    # Force VeryFastTree
+                    cmd = ["VeryFastTree", "-threads", self.config["tree_cpus"]]
+                    tree_program = "VeryFastTree"
+                elif ft_variant == "fasttree":
+                    # Force regular FastTree (no threading support)
+                    cmd = ["fasttree"]
+                    tree_program = "FastTree"
+                else:
+                    # Auto mode: choose based on threading needs (default)
+                    if int(self.config["tree_cpus"]) > 1:
+                        cmd = ["VeryFastTree", "-threads", self.config["tree_cpus"]]
+                        tree_program = "VeryFastTree"
+                    else:
+                        cmd = ["fasttree"]
+                        tree_program = "FastTree"
+
+                # Add other fasttree parameters (skip threading options from config since we set it above)
                 ft_params = self.config.get("ft_speciestree", "").strip()
                 if ft_params:
                     # Split parameters and filter out threading options
@@ -977,27 +1084,29 @@ class NSGTreeWorkflow:
                 # Add input file
                 cmd.append(str(concat_aln))
 
-                f.write(" ".join(cmd) + "\n")
-                self.logger.info(f"Running FastTree: {' '.join(cmd)}")
+                f.write(" ".join(cmd) + f" > {species_tree}\n")
+                self.logger.info(f"Running {tree_program}: {' '.join(cmd)} > {species_tree}")
 
                 with open(species_tree, 'w') as tree_out:
+                    monitor_label = f"{tree_program}-species"
                     if self.resource_monitor:
                         result = self.resource_monitor.run_with_monitoring(
-                            cmd, "FastTree-species", stdout=tree_out, stderr=f
+                            cmd, monitor_label, stdout=tree_out, stderr=f
                         )
                     else:
                         result = subprocess.run(cmd, stdout=tree_out, stderr=f)
                     if result.returncode != 0:
-                        self.logger.error(f"FastTree failed with return code {result.returncode}")
+                        self.logger.error(f"{tree_program} failed with return code {result.returncode}")
 
             else:
-                # IQ-TREE
+                # IQ-TREE - use all available cores for species tree
                 outpath = finaltree_dir / analysisname
                 cmd = [
                     "iqtree",
                     "--quiet",
                     "--prefix", str(outpath),
                     "-m", self.config["iq_speciestree"],
+                    "-T", self.config["tree_cpus"],
                     "-s", str(concat_aln)
                 ]
 
@@ -1059,16 +1168,25 @@ class NSGTreeWorkflow:
                 str(clade_output)
             ])
 
-            # Generate nearest neighbor analysis
-            self.logger.info("Generating nearest neighbor analysis")
-            nn_output = itol_dir / f"{analysisname}_neighbors"
+            # Generate nearest neighbor analysis (only if reference genomes are present)
+            if rfaadir and rfaadir.exists():
+                self.logger.info("Generating nearest neighbor analysis")
+                nn_output = itol_dir / f"{analysisname}_neighbors"
 
-            # Run ete3_nntree
-            ete3_nntree.main([
-                str(species_tree),
-                str(query_list_file),
-                str(nn_output)
-            ])
+                # Run ete3_nntree
+                ete3_nntree.main([
+                    str(species_tree),
+                    str(query_list_file),
+                    str(nn_output)
+                ])
+            else:
+                self.logger.info("Skipping nearest neighbor analysis (no reference genomes provided)")
+                # Create a placeholder file explaining why analysis was skipped
+                nn_output = itol_dir / f"{analysisname}_neighbors"
+                with open(f"{nn_output}.pairs", 'w') as f:
+                    f.write("Query\tClosest_Relative\tDistance\n")
+                    f.write("# Nearest neighbor analysis skipped - no reference genomes provided\n")
+                    f.write("# To enable nearest neighbor analysis, provide reference genomes using --rfaadir\n")
 
             # Create summary file
             summary_file = itol_dir / f"{analysisname}_analysis_summary.txt"
@@ -1077,15 +1195,24 @@ class NSGTreeWorkflow:
                 f.write("========================\n\n")
                 f.write(f"Analysis name: {analysisname}\n")
                 f.write(f"Query genomes: {len(query_genomes)}\n")
+                if rfaadir and rfaadir.exists():
+                    ref_count = len(list(rfaadir.glob("*.faa")))
+                    f.write(f"Reference genomes: {ref_count}\n")
                 f.write(f"Species tree: {species_tree.name}\n\n")
                 f.write("Generated files:\n")
                 f.write(f"- ITOL clade annotations: {clade_output.name}\n")
-                f.write(f"- Nearest neighbor analysis: {nn_output.name}.pairs\n")
+                if rfaadir and rfaadir.exists():
+                    f.write(f"- Nearest neighbor analysis: {nn_output.name}.pairs\n")
+                else:
+                    f.write(f"- Nearest neighbor analysis: Not applicable (query-only analysis)\n")
                 f.write(f"- Query genome list: {query_list_file.name}\n\n")
                 f.write("Instructions:\n")
                 f.write("1. Upload your tree file to https://itol.embl.de/\n")
                 f.write("2. Use the ITOL annotation files to highlight query clades\n")
-                f.write("3. Check the nearest neighbor file for phylogenetic relationships\n")
+                if rfaadir and rfaadir.exists():
+                    f.write("3. Check the nearest neighbor file for phylogenetic relationships\n")
+                else:
+                    f.write("3. Note: This is a query-only analysis - provide reference genomes for nearest neighbor analysis\n")
 
             self.logger.info(f"Tree analysis completed. Results in: {itol_dir}")
 
@@ -1172,11 +1299,33 @@ Example usage:
     # Update config with command line arguments
     workflow = NSGTreeWorkflow(user_config_file=args.config)
 
-    # Override CPU settings if specified
+    # Store original config values to detect if user specified custom settings
+    original_config = dict(workflow.config)
+
+    # Override CPU settings if specified (but respect user config preferences)
     if args.cores:
-        workflow.config['hmmsearch_cpu'] = str(args.cores)
-        workflow.config['extract_processes'] = str(args.cores)
-        workflow.config['tree_cpus'] = str(args.cores)
+        # Check if user has custom config or we should use CLI cores for all settings
+        user_has_custom_cores = (
+            args.config and os.path.exists(args.config) and
+            any(original_config.get(key, '') != str(8) for key in ['hmmsearch_cpu', 'extract_processes', 'tree_cpus'])
+        )
+
+        if not user_has_custom_cores:
+            # User didn't customize core settings, apply cores to all
+            workflow.config['hmmsearch_cpu'] = str(args.cores)
+            workflow.config['extract_processes'] = str(args.cores)
+            workflow.config['tree_cpus'] = str(args.cores)
+            workflow.config['mafft_thread'] = f"--thread {args.cores}"
+        else:
+            # User has custom settings, only update if they used default values
+            if original_config.get('hmmsearch_cpu') == '8':
+                workflow.config['hmmsearch_cpu'] = str(args.cores)
+            if original_config.get('extract_processes') == '8':
+                workflow.config['extract_processes'] = str(args.cores)
+            if original_config.get('tree_cpus') == '8':
+                workflow.config['tree_cpus'] = str(args.cores)
+            if original_config.get('mafft_thread') == '--thread 8':
+                workflow.config['mafft_thread'] = f"--thread {args.cores}"
 
     try:
         result_dir = workflow.run_workflow(

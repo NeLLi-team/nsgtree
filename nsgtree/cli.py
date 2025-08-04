@@ -23,7 +23,7 @@ console = Console()
 def version_callback(value: bool):
     """Handle version display"""
     if value:
-        console.print("NSGTree version 0.5.1")
+        console.print("NSGTree version 0.6.5")
         console.print("DOE Joint Genome Institute")
         raise typer.Exit()
 
@@ -50,7 +50,7 @@ def print_banner():
     banner = """
 [bold blue]🧬 NSGTree - New Simple Genome Tree[/bold blue]
 [dim]Fast phylogenetic analysis from concatenated protein alignments[/dim]
-[dim]Version 0.5.1 | DOE Joint Genome Institute[/dim]
+[dim]Version 0.6.5 | DOE Joint Genome Institute[/dim]
     """
     console.print(Panel(banner, style="blue"))
 
@@ -103,11 +103,21 @@ def run(
     models: str = typer.Argument(..., help="Path to HMM models file"),
     rfaadir: Optional[str] = typer.Option(None, "--rfaadir", "-r", help="Directory containing reference FAA files (optional)"),
     config: Optional[str] = typer.Option(None, "--config", "-c", help="User configuration file (YAML format)"),
-    cores: int = typer.Option(8, "--cores", "-j", help="Number of CPU cores to use", min=1, max=64),
+    cores: int = typer.Option(8, "--cores", "-j", help="Number of CPU cores to use", min=1),
     tree_method: Optional[str] = typer.Option(None, "--tree-method", "-t",
-                                            help="Tree building method: 'fasttree' or 'iqtree'"),
+                                            help="Tree building method: 'fasttree' (VeryFastTree/FastTree) or 'iqtree'"),
+    ft_variant: Optional[str] = typer.Option(None, "--ft-variant",
+                                           help="FastTree variant when tree-method=fasttree: 'auto', 'veryfasttree', or 'fasttree'"),
     min_marker: Optional[float] = typer.Option(None, "--min-marker", "-m",
                                              help="Minimum fraction of markers required per genome", min=0.0, max=1.0),
+    hmmsearch_cutoff: Optional[str] = typer.Option(None, "--hmmsearch-cutoff",
+                                                  help="HMMsearch cutoff (e.g., '-E 1e-10', '--cut_ga')"),
+    max_sdup: Optional[int] = typer.Option(None, "--max-sdup",
+                                          help="Max single-copy duplications allowed per genome", min=1),
+    max_dupl: Optional[float] = typer.Option(None, "--max-dupl",
+                                           help="Max fraction of markers allowed in multiple copies", min=0.0, max=1.0),
+    length_filter: Optional[float] = typer.Option(None, "--length-filter",
+                                                 help="Remove sequences shorter than fraction of median length", min=0.0, max=1.0),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose logging"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without executing"),
     output_name: Optional[str] = typer.Option(None, "--output-name", "-o", help="Custom output directory name"),
@@ -178,8 +188,18 @@ def run(
         table.add_row("Config file", config)
     if tree_method:
         table.add_row("Tree method", tree_method)
+    if ft_variant:
+        table.add_row("FastTree variant", ft_variant)
     if min_marker:
         table.add_row("Min marker fraction", str(min_marker))
+    if hmmsearch_cutoff:
+        table.add_row("HMMsearch cutoff", hmmsearch_cutoff)
+    if max_sdup:
+        table.add_row("Max single duplications", str(max_sdup))
+    if max_dupl:
+        table.add_row("Max duplicate fraction", str(max_dupl))
+    if length_filter:
+        table.add_row("Length filter", str(length_filter))
 
     console.print(table)
 
@@ -199,15 +219,49 @@ def run(
     try:
         workflow = NSGTreeWorkflow(user_config_file=config)
 
-        # Override config with command line arguments
+        # Store original config values to detect if user specified custom settings
+        original_config = dict(workflow.config)
+
+        # Override config with command line arguments (but respect user config preferences)
         if cores:
-            workflow.config['hmmsearch_cpu'] = str(cores)
-            workflow.config['extract_processes'] = str(cores)
-            workflow.config['tree_cpus'] = str(cores)
+            # Check if user has custom config or we should use CLI cores for all settings
+            user_has_custom_cores = (
+                config and os.path.exists(config) and
+                any(original_config.get(key, '') != str(8) for key in ['hmmsearch_cpu', 'extract_processes', 'tree_cpus'])
+            )
+
+            if not user_has_custom_cores:
+                # User didn't customize core settings, apply cores to all
+                workflow.config['hmmsearch_cpu'] = str(cores)
+                workflow.config['extract_processes'] = str(cores)
+                workflow.config['tree_cpus'] = str(cores)
+                workflow.config['mafft_thread'] = f"--thread {cores}"
+            else:
+                # User has custom settings, only update if they used default values
+                if original_config.get('hmmsearch_cpu') == '8':
+                    workflow.config['hmmsearch_cpu'] = str(cores)
+                if original_config.get('extract_processes') == '8':
+                    workflow.config['extract_processes'] = str(cores)
+                if original_config.get('tree_cpus') == '8':
+                    workflow.config['tree_cpus'] = str(cores)
+                if original_config.get('mafft_thread') == '--thread 8':
+                    workflow.config['mafft_thread'] = f"--thread {cores}"
+
+        # Override other config parameters if specified via CLI
         if tree_method:
             workflow.config['tmethod'] = tree_method
+        if ft_variant:
+            workflow.config['ft_variant'] = ft_variant
         if min_marker:
             workflow.config['minmarker'] = str(min_marker)
+        if hmmsearch_cutoff:
+            workflow.config['hmmsearch_cutoff'] = hmmsearch_cutoff
+        if max_sdup:
+            workflow.config['maxsdup'] = str(max_sdup)
+        if max_dupl:
+            workflow.config['maxdupl'] = str(max_dupl)
+        if length_filter:
+            workflow.config['lengthfilter'] = str(length_filter)
 
         if verbose:
             import logging
@@ -343,6 +397,7 @@ def check(
         ("MAFFT", "mafft"),
         ("trimAl", "trimal"),
         ("FastTree", "fasttree"),
+        ("VeryFastTree", "VeryFastTree"),
         ("IQ-TREE", "iqtree"),
         ("ete3", "ete3")
     ]
@@ -351,7 +406,7 @@ def check(
         try:
             if module == "python":
                 console.print(f"  ✅ {name}: Python {sys.version.split()[0]}")
-            elif module in ["hmmsearch", "mafft", "trimal", "fasttree", "iqtree"]:
+            elif module in ["hmmsearch", "mafft", "trimal", "fasttree", "VeryFastTree", "iqtree"]:
                 import subprocess
                 result = subprocess.run([module, "--help"], capture_output=True, text=True)
                 console.print(f"  ✅ {name}: Available")
@@ -419,7 +474,7 @@ def main(
     Build species trees from concatenated alignments with automatic visualization.
     """
     if version:
-        console.print("NSGTree version 0.5.1")
+        console.print("NSGTree version 0.6.5")
         console.print("DOE Joint Genome Institute")
         raise typer.Exit()
 
