@@ -15,11 +15,11 @@ Perfect for comparative genomics, phylogenetic placement, and understanding evol
 
 ## Key Features
 
-✅ **One-command analysis** - Just point it at your genome files
-✅ **Fast** - Builds trees 20-50% faster than similar tools
-✅ **Easy to install** - All dependencies installed automatically
-✅ **Safe** - Each run gets its own timestamped folder
-✅ **Visualization ready** - Outputs work directly with tree viewers
+- ✅ **One-command analysis** - Just point it at your genome files
+- ✅ **Fast** - Builds trees 20-50% faster than similar tools
+- ✅ **Easy to install** - All dependencies installed automatically
+- ✅ **Safe** - Each run gets its own timestamped folder
+- ✅ **Visualization ready** - Outputs work directly with tree viewers
 
 ## Installation
 
