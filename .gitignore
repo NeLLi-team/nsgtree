@@ -1,3 +1,29 @@
+# Output directories
+example/nsgt_out/
+analyses/
+
+# NSGTree output directories (with timestamps)
+nsgt_out/
+*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]/
+
+# Development files
+user_config_dev.yml
+
+# Python build artifacts
+__pycache__/
+*.egg-info/
+build/
+dist/
+*.pyc
+*.pyo
+
+# Legacy files (no longer needed)
 .snakemake/
 examplegv/
-user_config_dev.yml
+
+# Test directories
+/example_q/nsgt_out
+test_output/
+my_custom_results/
+RELEASE_NOTES_v*.md
+nsgtree/main.py.backup
